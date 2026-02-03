@@ -110,7 +110,7 @@ export default function DomainsPage() {
             {domains.map(domain => (
               <div key={domain.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
                 <div>
-                  <div className="font-medium text-gray-800">{domain.domain}</div>
+                  <div className="font-medium text-blue-800">{domain.domain}</div>
                   {domain.name && <div className="text-sm text-gray-500">{domain.name}</div>}
                   <div className="text-xs text-gray-400 mt-1">
                     建立時間：{new Date(domain.created_at).toLocaleString('zh-TW')}

@@ -231,7 +231,7 @@ export default function LinksPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-blue-600 mb-1">前景色</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">前景色</label>
                 <div className="flex gap-2 items-center">
                   <input type="color" value={qrSettings.fg_color} onChange={e => setQrSettings({ ...qrSettings, fg_color: e.target.value })} className="w-10 h-10 rounded cursor-pointer" />
                   <input type="text" value={qrSettings.fg_color} onChange={e => setQrSettings({ ...qrSettings, fg_color: e.target.value })} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
@@ -239,7 +239,7 @@ export default function LinksPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-blue-600 mb-1">背景色</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">背景色</label>
                 <div className="flex gap-2 items-center">
                   <input type="color" value={qrSettings.bg_color} onChange={e => setQrSettings({ ...qrSettings, bg_color: e.target.value })} className="w-10 h-10 rounded cursor-pointer" />
                   <input type="text" value={qrSettings.bg_color} onChange={e => setQrSettings({ ...qrSettings, bg_color: e.target.value })} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
@@ -247,7 +247,7 @@ export default function LinksPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-blue-600 mb-1">Logo 圖片網址</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Logo 圖片網址</label>
                 <input
                   type="text"
                   value={qrSettings.logo_url}
@@ -515,7 +515,7 @@ export default function LinksPage() {
                         <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">A/B</span>
                       )}
                     </div>
-                    <div className="text-sm text-gray-700 truncate mb-1">
+                    <div className="text-sm text-blue-800 truncate mb-1">
                       {fullUrl}
                     </div>
                     <div className="text-xs text-gray-400 truncate">
