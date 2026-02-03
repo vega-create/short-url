@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Domain, ShortLink, LinkTarget } from '@/lib/types'
+import { Domain, ShortLink, LinkTarget, ParamUtmRule } from '@/lib/types'
 import { buildShortUrl } from '@/lib/utils'
 
 type ViewMode = 'list' | 'create' | 'edit' | 'qr'
@@ -24,6 +24,12 @@ export default function LinksPage() {
     gtm_id: '',
     ga_id: '',
     tags: [] as string[],
+    utm_source: '',
+    utm_medium: '',
+    utm_campaign: '',
+    utm_term: '',
+    utm_content: '',
+    append_utm: false,
   })
   const [formError, setFormError] = useState('')
   const [tagInput, setTagInput] = useState('')
@@ -31,6 +37,10 @@ export default function LinksPage() {
   // A/B 目標
   const [targets, setTargets] = useState<LinkTarget[]>([])
   const [newTarget, setNewTarget] = useState({ target_url: '', weight: 1, name: '' })
+
+  // UTM 渠道對照表
+  const [utmRules, setUtmRules] = useState<ParamUtmRule[]>([])
+  const [newRule, setNewRule] = useState({ param_pattern: '', utm_source: '', utm_medium: '', utm_campaign: '', utm_term: '', utm_content: '' })
 
   // 點擊統計
   const [clickStats, setClickStats] = useState<Record<string, { total: number; unique: number }>>({})
@@ -69,11 +79,13 @@ export default function LinksPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const resetForm = () => {
-    setForm({ domain_id: domains[0]?.id || '', slug: '', name: '', target_url: '', pixel_id: '', gtm_id: '', ga_id: '', tags: [] })
+    setForm({ domain_id: domains[0]?.id || '', slug: '', name: '', target_url: '', pixel_id: '', gtm_id: '', ga_id: '', tags: [], utm_source: '', utm_medium: '', utm_campaign: '', utm_term: '', utm_content: '', append_utm: false })
     setFormError('')
     setTagInput('')
     setTargets([])
     setNewTarget({ target_url: '', weight: 1, name: '' })
+    setUtmRules([])
+    setNewRule({ param_pattern: '', utm_source: '', utm_medium: '', utm_campaign: '', utm_term: '', utm_content: '' })
   }
 
   const handleCreate = () => {
@@ -95,8 +107,15 @@ export default function LinksPage() {
       gtm_id: data.gtm_id || '',
       ga_id: data.ga_id || '',
       tags: data.tags || [],
+      utm_source: data.utm_source || '',
+      utm_medium: data.utm_medium || '',
+      utm_campaign: data.utm_campaign || '',
+      utm_term: data.utm_term || '',
+      utm_content: data.utm_content || '',
+      append_utm: data.append_utm || false,
     })
     setTargets(data.link_targets || [])
+    setUtmRules(data.param_utm_rules || [])
     setViewMode('edit')
   }
 
@@ -170,6 +189,44 @@ export default function LinksPage() {
     await fetch(`/api/links/${editingLink.id}/targets/${targetId}`, { method: 'DELETE' })
     setTargets(targets.filter(t => t.id !== targetId))
   }
+
+  // UTM 規則管理
+  const handleAddUtmRule = async () => {
+    if (!editingLink || !newRule.param_pattern) return
+    const res = await fetch(`/api/links/${editingLink.id}/utm-rules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newRule),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setUtmRules([...utmRules, data])
+      setNewRule({ param_pattern: '', utm_source: '', utm_medium: '', utm_campaign: '', utm_term: '', utm_content: '' })
+    } else {
+      const err = await res.json()
+      alert(err.error || '新增失敗')
+    }
+  }
+
+  const handleDeleteUtmRule = async (ruleId: string) => {
+    if (!editingLink) return
+    await fetch(`/api/links/${editingLink.id}/utm-rules?ruleId=${ruleId}`, { method: 'DELETE' })
+    setUtmRules(utmRules.filter(r => r.id !== ruleId))
+  }
+
+  // 常用來源快捷
+  const quickSources = [
+    { label: 'Facebook', source: 'facebook', medium: 'post' },
+    { label: 'FB 廣告', source: 'facebook', medium: 'cpc' },
+    { label: 'Instagram', source: 'instagram', medium: 'post' },
+    { label: 'IG 限動', source: 'instagram', medium: 'story' },
+    { label: 'LINE', source: 'line', medium: 'message' },
+    { label: 'LINE 群組', source: 'line', medium: 'group' },
+    { label: 'YouTube', source: 'youtube', medium: 'video' },
+    { label: 'Google 廣告', source: 'google', medium: 'cpc' },
+    { label: 'Email', source: 'email', medium: 'newsletter' },
+    { label: '蝦皮', source: 'shopee', medium: 'shop' },
+  ]
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -589,6 +646,106 @@ export default function LinksPage() {
                 />
               </div>
             </div>
+            <p className="text-xs text-gray-400 mt-2 ml-1">💡 有填追蹤碼的短網址，點擊時會先載入中間頁觸發追蹤碼（0.8秒），再跳轉。</p>
+          </details>
+
+          {/* UTM 設定（可收合） */}
+          <details className="mb-4" open={!!(form.utm_source || form.utm_medium || form.utm_campaign)}>
+            <summary className="text-sm font-medium text-gray-600 cursor-pointer hover:text-gray-800">
+              🏷️ UTM 追蹤設定（選用）
+            </summary>
+            <div className="mt-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              {/* 快捷選單 */}
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">⚡ 快速填入常用來源</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {quickSources.map(qs => (
+                    <button
+                      key={qs.label}
+                      type="button"
+                      onClick={() => setForm({ ...form, utm_source: qs.source, utm_medium: qs.medium })}
+                      className="text-xs px-2.5 py-1 bg-white border border-amber-300 text-amber-800 rounded-full hover:bg-amber-100 transition"
+                    >
+                      {qs.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* UTM 欄位 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">utm_source <span className="text-gray-400">來源</span></label>
+                  <input
+                    type="text"
+                    value={form.utm_source}
+                    onChange={e => setForm({ ...form, utm_source: e.target.value })}
+                    placeholder="facebook"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">utm_medium <span className="text-gray-400">媒介</span></label>
+                  <input
+                    type="text"
+                    value={form.utm_medium}
+                    onChange={e => setForm({ ...form, utm_medium: e.target.value })}
+                    placeholder="post"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">utm_campaign <span className="text-gray-400">活動</span></label>
+                  <input
+                    type="text"
+                    value={form.utm_campaign}
+                    onChange={e => setForm({ ...form, utm_campaign: e.target.value })}
+                    placeholder="母親節"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">utm_term <span className="text-gray-400">關鍵字（選填）</span></label>
+                  <input
+                    type="text"
+                    value={form.utm_term}
+                    onChange={e => setForm({ ...form, utm_term: e.target.value })}
+                    placeholder="選填"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">utm_content <span className="text-gray-400">內容（選填）</span></label>
+                  <input
+                    type="text"
+                    value={form.utm_content}
+                    onChange={e => setForm({ ...form, utm_content: e.target.value })}
+                    placeholder="選填"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* 附加 UTM 開關 */}
+              <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-amber-200">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.append_utm}
+                    onChange={e => setForm({ ...form, append_utm: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+                </label>
+                <div>
+                  <div className="text-sm font-medium text-gray-700">附加 UTM 到目標網址</div>
+                  <div className="text-xs text-gray-400">開啟：跳轉時自動把 UTM 加到目標網址（適用目標是自己官網）</div>
+                  <div className="text-xs text-gray-400">關閉：UTM 只用於中間頁追蹤碼觸發和後台統計（適用目標是 LINE/蝦皮等）</div>
+                </div>
+              </div>
+            </div>
           </details>
 
           {formError && <p className="text-red-500 text-sm mb-4">{formError}</p>}
@@ -669,6 +826,116 @@ export default function LinksPage() {
                 + 新增
               </button>
             </div>
+          </div>
+        )}
+
+        {/* 渠道 UTM 對照表（僅編輯時） */}
+        {isEdit && editingLink && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-2">🗺️ 渠道 UTM 對照表</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              讓不同路徑參數對應不同 UTM。例如：<code className="bg-gray-100 px-1.5 py-0.5 rounded text-red-600">/{form.slug}/FB</code> → facebook/post、<code className="bg-gray-100 px-1.5 py-0.5 rounded text-red-600">/{form.slug}/IG</code> → instagram/post
+            </p>
+
+            {utmRules.length > 0 && (
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">路徑參數</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">source</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">medium</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">campaign</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {utmRules.map(rule => (
+                      <tr key={rule.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2">
+                          <code className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs">/{rule.param_pattern}</code>
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">{rule.utm_source || '—'}</td>
+                        <td className="px-3 py-2 text-gray-700">{rule.utm_medium || '—'}</td>
+                        <td className="px-3 py-2 text-gray-700">{rule.utm_campaign || '—'}</td>
+                        <td className="px-3 py-2">
+                          <button
+                            onClick={() => handleDeleteUtmRule(rule.id)}
+                            className="text-red-500 hover:text-red-700 text-xs"
+                          >
+                            刪除
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 快捷填入 */}
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">⚡ 快速填入</label>
+              <div className="flex flex-wrap gap-1.5">
+                {quickSources.map(qs => (
+                  <button
+                    key={qs.label}
+                    type="button"
+                    onClick={() => setNewRule({ ...newRule, utm_source: qs.source, utm_medium: qs.medium })}
+                    className="text-xs px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-full hover:bg-amber-100 transition"
+                  >
+                    {qs.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 新增規則 */}
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+              <input
+                type="text"
+                value={newRule.param_pattern}
+                onChange={e => setNewRule({ ...newRule, param_pattern: e.target.value })}
+                placeholder="路徑參數 (如 FB)"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <input
+                type="text"
+                value={newRule.utm_source}
+                onChange={e => setNewRule({ ...newRule, utm_source: e.target.value })}
+                placeholder="source"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <input
+                type="text"
+                value={newRule.utm_medium}
+                onChange={e => setNewRule({ ...newRule, utm_medium: e.target.value })}
+                placeholder="medium"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <input
+                type="text"
+                value={newRule.utm_campaign}
+                onChange={e => setNewRule({ ...newRule, utm_campaign: e.target.value })}
+                placeholder="campaign"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <input
+                type="text"
+                value={newRule.utm_term}
+                onChange={e => setNewRule({ ...newRule, utm_term: e.target.value })}
+                placeholder="term（選填）"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleAddUtmRule}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition whitespace-nowrap"
+              >
+                + 新增規則
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">💡 路徑參數會自動匹配最長的規則。例如「IG/限動」比「IG」優先。沒匹配到的用上方預設 UTM。</p>
           </div>
         )}
       </div>
@@ -761,6 +1028,12 @@ export default function LinksPage() {
                         <span className="font-medium text-gray-800">{link.name || link.slug}</span>
                         {link.use_ab_test && (
                           <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">A/B</span>
+                        )}
+                        {link.utm_source && (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">UTM</span>
+                        )}
+                        {(link.param_utm_rules && link.param_utm_rules.length > 0) && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">渠道×{link.param_utm_rules.length}</span>
                         )}
                       </div>
                       <a href={fullUrl} target="_blank" rel="noopener" className="text-sm text-blue-800 hover:underline truncate block mb-1">

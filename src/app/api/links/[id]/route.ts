@@ -14,7 +14,7 @@ export async function GET(
   const { id } = await params
   const { data, error } = await supabaseAdmin
     .from('short_links')
-    .select('*, domains(domain, name), link_targets(*), qr_settings(*)')
+    .select('*, domains(domain, name), link_targets(*), qr_settings(*), param_utm_rules(*)')
     .eq('id', id)
     .single()
 
@@ -33,7 +33,8 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
-  const { slug, name, target_url, is_active, use_ab_test, pixel_id, gtm_id, ga_id, tags } = body
+  const { slug, name, target_url, is_active, use_ab_test, pixel_id, gtm_id, ga_id, tags,
+    utm_source, utm_medium, utm_campaign, utm_term, utm_content, append_utm } = body
 
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (slug !== undefined) updateData.slug = slug.trim()
@@ -45,6 +46,12 @@ export async function PUT(
   if (gtm_id !== undefined) updateData.gtm_id = gtm_id
   if (ga_id !== undefined) updateData.ga_id = ga_id
   if (tags !== undefined) updateData.tags = tags
+  if (utm_source !== undefined) updateData.utm_source = utm_source || null
+  if (utm_medium !== undefined) updateData.utm_medium = utm_medium || null
+  if (utm_campaign !== undefined) updateData.utm_campaign = utm_campaign || null
+  if (utm_term !== undefined) updateData.utm_term = utm_term || null
+  if (utm_content !== undefined) updateData.utm_content = utm_content || null
+  if (append_utm !== undefined) updateData.append_utm = append_utm
 
   const { data, error } = await supabaseAdmin
     .from('short_links')

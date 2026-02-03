@@ -25,7 +25,7 @@ export async function GET(
 
   const { data: link } = await supabaseAdmin
     .from('short_links')
-    .select(`*, domains!inner(domain), link_targets(*)`)
+    .select(`*, domains!inner(domain), link_targets(*), param_utm_rules(*)`)
     .eq('domains.domain', host)
     .eq('slug', shortCode)
     .eq('is_active', true)
@@ -40,6 +40,60 @@ export async function GET(
   if (link.use_ab_test && link.link_targets && link.link_targets.length > 0) {
     const target = selectTargetByWeight(link.link_targets)
     if (target) targetUrl = target.target_url
+  }
+
+  // === UTM 決定邏輯 ===
+  // 1. 先查渠道 UTM 對照表（最長路徑優先匹配）
+  // 2. 沒匹配到就用預設 UTM
+  let utmSource = link.utm_source || null
+  let utmMedium = link.utm_medium || null
+  let utmCampaign = link.utm_campaign || null
+  let utmTerm = link.utm_term || null
+  let utmContent = link.utm_content || null
+
+  if (trackingParams && link.param_utm_rules && link.param_utm_rules.length > 0) {
+    // 按 param_pattern 長度排序（最長優先匹配）
+    const sortedRules = [...link.param_utm_rules].sort(
+      (a, b) => b.param_pattern.length - a.param_pattern.length
+    )
+    for (const rule of sortedRules) {
+      // 完全匹配或前綴匹配（trackingParams 以 rule.param_pattern 開頭）
+      if (
+        trackingParams === rule.param_pattern ||
+        trackingParams.startsWith(rule.param_pattern + '/')
+      ) {
+        if (rule.utm_source) utmSource = rule.utm_source
+        if (rule.utm_medium) utmMedium = rule.utm_medium
+        if (rule.utm_campaign) utmCampaign = rule.utm_campaign
+        if (rule.utm_term) utmTerm = rule.utm_term
+        if (rule.utm_content) utmContent = rule.utm_content
+        break
+      }
+    }
+  }
+
+  // 附加 UTM 到目標網址（只有 append_utm=true 時）
+  if (link.append_utm) {
+    const utmEntries: [string, string][] = []
+    if (utmSource) utmEntries.push(['utm_source', utmSource])
+    if (utmMedium) utmEntries.push(['utm_medium', utmMedium])
+    if (utmCampaign) utmEntries.push(['utm_campaign', utmCampaign])
+    if (utmTerm) utmEntries.push(['utm_term', utmTerm])
+    if (utmContent) utmEntries.push(['utm_content', utmContent])
+
+    if (utmEntries.length > 0) {
+      try {
+        const urlObj = new URL(targetUrl)
+        for (const [key, val] of utmEntries) {
+          if (!urlObj.searchParams.has(key)) {
+            urlObj.searchParams.set(key, val)
+          }
+        }
+        targetUrl = urlObj.toString()
+      } catch {
+        // URL 格式有問題就不加
+      }
+    }
   }
 
   // 記錄點擊
@@ -57,19 +111,32 @@ export async function GET(
     user_agent: userAgent,
     referer: referer,
     device,
+    utm_source: utmSource,
+    utm_medium: utmMedium,
+    utm_campaign: utmCampaign,
   })
 
   // 有追蹤碼時，用 HTML 頁面載入追蹤碼再跳轉
   const hasTracking = link.pixel_id || link.gtm_id || link.ga_id
   if (hasTracking) {
-    return renderTrackingRedirect(targetUrl, link)
+    return renderTrackingRedirect(targetUrl, link, {
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign,
+      short_link: link.slug,
+      param: trackingParams,
+    })
   }
 
   return NextResponse.redirect(targetUrl, 302)
 }
 
 // ===== 追蹤碼跳轉頁面 =====
-function renderTrackingRedirect(targetUrl: string, link: Record<string, unknown>) {
+function renderTrackingRedirect(
+  targetUrl: string,
+  link: Record<string, unknown>,
+  utmData: Record<string, string | null>
+) {
   let trackingScripts = ''
 
   // FB Pixel
@@ -83,12 +150,30 @@ function renderTrackingRedirect(targetUrl: string, link: Record<string, unknown>
       document,'script','https://connect.facebook.net/en_US/fbevents.js');
       fbq('init','${link.pixel_id}');
       fbq('track','PageView');
+      fbq('trackCustom','ShortLinkClick',${JSON.stringify({
+        utm_source: utmData.utm_source || '',
+        utm_medium: utmData.utm_medium || '',
+        utm_campaign: utmData.utm_campaign || '',
+        short_link: utmData.short_link || '',
+        param: utmData.param || '',
+      })});
     </script>`
   }
 
   // GTM
   if (link.gtm_id) {
     trackingScripts += `
+    <script>
+      window.dataLayer=window.dataLayer||[];
+      window.dataLayer.push(${JSON.stringify({
+        event: 'short_link_click',
+        utm_source: utmData.utm_source || '',
+        utm_medium: utmData.utm_medium || '',
+        utm_campaign: utmData.utm_campaign || '',
+        short_link: utmData.short_link || '',
+        param: utmData.param || '',
+      })});
+    </script>
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
     j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
@@ -105,6 +190,13 @@ function renderTrackingRedirect(targetUrl: string, link: Record<string, unknown>
       function gtag(){dataLayer.push(arguments);}
       gtag('js',new Date());
       gtag('config','${link.ga_id}');
+      gtag('event','short_link_click',${JSON.stringify({
+        utm_source: utmData.utm_source || '',
+        utm_medium: utmData.utm_medium || '',
+        utm_campaign: utmData.utm_campaign || '',
+        short_link: utmData.short_link || '',
+        param: utmData.param || '',
+      })});
     </script>`
   }
 

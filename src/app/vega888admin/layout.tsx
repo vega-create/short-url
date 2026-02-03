@@ -72,6 +72,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/vega888admin', label: '📊 總覽', exact: true },
     { href: '/vega888admin/domains', label: '🌐 網域管理' },
     { href: '/vega888admin/links', label: '🔗 短網址管理' },
+    { href: '/vega888admin/utm', label: '🏷️ UTM 管理' },
+    { href: '/vega888admin/analytics', label: '📊 點擊分析' },
     { href: '/vega888admin/bio', label: '📄 Bio 頁面' },
   ]
 

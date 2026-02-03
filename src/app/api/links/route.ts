@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabaseAdmin
     .from('short_links')
-    .select('*, domains(domain, name), link_targets(*)')
+    .select('*, domains(domain, name), link_targets(*), param_utm_rules(*)')
     .order('created_at', { ascending: false })
 
   if (domainId) {
@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { domain_id, slug, name, target_url, pixel_id, gtm_id, ga_id, tags } = body
+  const { domain_id, slug, name, target_url, pixel_id, gtm_id, ga_id, tags,
+    utm_source, utm_medium, utm_campaign, utm_term, utm_content, append_utm } = body
 
   if (!domain_id || !slug || !target_url) {
     return NextResponse.json(
@@ -53,6 +54,12 @@ export async function POST(request: NextRequest) {
       gtm_id,
       ga_id,
       tags: tags || [],
+      utm_source: utm_source || null,
+      utm_medium: utm_medium || null,
+      utm_campaign: utm_campaign || null,
+      utm_term: utm_term || null,
+      utm_content: utm_content || null,
+      append_utm: append_utm || false,
     })
     .select('*, domains(domain)')
     .single()

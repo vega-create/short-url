@@ -19,12 +19,19 @@ export interface ShortLink {
   gtm_id: string | null
   ga_id: string | null
   tags: string[]
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  utm_term: string | null
+  utm_content: string | null
+  append_utm: boolean
   created_at: string
   updated_at: string
   // Joined
   domains?: Domain
   link_targets?: LinkTarget[]
   qr_settings?: QrSetting | null
+  param_utm_rules?: ParamUtmRule[]
 }
 
 export interface LinkTarget {
@@ -34,6 +41,18 @@ export interface LinkTarget {
   weight: number
   name: string | null
   is_active: boolean
+  created_at: string
+}
+
+export interface ParamUtmRule {
+  id: string
+  short_link_id: string
+  param_pattern: string
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  utm_term: string | null
+  utm_content: string | null
   created_at: string
 }
 
@@ -47,6 +66,9 @@ export interface ClickLog {
   referer: string | null
   country: string | null
   device: string | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
   clicked_at: string
 }
 
