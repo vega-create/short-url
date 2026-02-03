@@ -21,6 +21,7 @@ export async function GET(
 
   // 短網址重定向
   const shortCode = firstSegment
+  const trackingParams = slug.slice(1).map(s => decodeURIComponent(s)).join('/')
 
   const { data: link } = await supabaseAdmin
     .from('short_links')
@@ -41,7 +42,83 @@ export async function GET(
     if (target) targetUrl = target.target_url
   }
 
+  // 記錄點擊
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const userAgent = request.headers.get('user-agent') || ''
+  const referer = request.headers.get('referer') || ''
+  const isMobile = /mobile|android|iphone/i.test(userAgent)
+  const isTablet = /tablet|ipad/i.test(userAgent)
+  const device = isTablet ? 'tablet' : isMobile ? 'mobile' : 'desktop'
+
+  await supabaseAdmin.from('click_logs').insert({
+    short_link_id: link.id,
+    param: trackingParams || null,
+    ip,
+    user_agent: userAgent,
+    referer: referer,
+    device,
+  })
+
+  // 有追蹤碼時，用 HTML 頁面載入追蹤碼再跳轉
+  const hasTracking = link.pixel_id || link.gtm_id || link.ga_id
+  if (hasTracking) {
+    return renderTrackingRedirect(targetUrl, link)
+  }
+
   return NextResponse.redirect(targetUrl, 302)
+}
+
+// ===== 追蹤碼跳轉頁面 =====
+function renderTrackingRedirect(targetUrl: string, link: Record<string, unknown>) {
+  let trackingScripts = ''
+
+  // FB Pixel
+  if (link.pixel_id) {
+    trackingScripts += `
+    <script>
+      !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+      n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+      document,'script','https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init','${link.pixel_id}');
+      fbq('track','PageView');
+    </script>`
+  }
+
+  // GTM
+  if (link.gtm_id) {
+    trackingScripts += `
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','${link.gtm_id}');</script>`
+  }
+
+  // GA4
+  if (link.ga_id) {
+    trackingScripts += `
+    <script async src="https://www.googletagmanager.com/gtag/js?id=${link.ga_id}"></script>
+    <script>
+      window.dataLayer=window.dataLayer||[];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js',new Date());
+      gtag('config','${link.ga_id}');
+    </script>`
+  }
+
+  const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+${trackingScripts}
+<script>setTimeout(function(){window.location.href="${targetUrl}"},800);</script>
+</head><body></body></html>`
+
+  return new Response(html, {
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  })
 }
 
 // ===== Bio 頁面渲染 =====

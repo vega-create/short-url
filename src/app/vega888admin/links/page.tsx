@@ -32,13 +32,37 @@ export default function LinksPage() {
   const [targets, setTargets] = useState<LinkTarget[]>([])
   const [newTarget, setNewTarget] = useState({ target_url: '', weight: 1, name: '' })
 
+  // 點擊統計
+  const [clickStats, setClickStats] = useState<Record<string, { total: number; unique: number }>>({})
+
+  // 分頁
+  const [currentPage, setCurrentPage] = useState(1)
+  const perPage = 10
+
+  // 批量選取
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // UTM 產生器
+  const [showUtm, setShowUtm] = useState<string | null>(null)
+  const [utmParams, setUtmParams] = useState({ source: '', medium: '', campaign: '', term: '', content: '' })
   const fetchData = useCallback(async () => {
-    const [domainsRes, linksRes] = await Promise.all([
+    const [domainsRes, linksRes, statsRes] = await Promise.all([
       fetch('/api/domains').then(r => r.json()),
       fetch('/api/links' + (filterDomain ? `?domain_id=${filterDomain}` : '')).then(r => r.json()),
+      fetch('/api/clicks').then(r => r.json()).catch(() => []),
     ])
     setDomains(Array.isArray(domainsRes) ? domainsRes : [])
     setLinks(Array.isArray(linksRes) ? linksRes : [])
+    
+    // 整理統計數據
+    const statsMap: Record<string, { total: number; unique: number }> = {}
+    if (Array.isArray(statsRes)) {
+      for (const s of statsRes) {
+        statsMap[s.link_id] = { total: s.total, unique: s.unique }
+      }
+    }
+    setClickStats(statsMap)
+    
     setLoading(false)
   }, [filterDomain])
 
@@ -85,7 +109,14 @@ export default function LinksPage() {
       return
     }
 
+    // 重複短碼檢查
     const isEdit = viewMode === 'edit' && editingLink
+    const duplicate = links.find(l => l.domain_id === form.domain_id && l.slug === form.slug.trim() && (!isEdit || l.id !== editingLink?.id))
+    if (duplicate) {
+      setFormError('⚠️ 此網域下已有相同的短碼「' + form.slug + '」，請換一個')
+      return
+    }
+
     const url = isEdit ? `/api/links/${editingLink.id}` : '/api/links'
     const method = isEdit ? 'PUT' : 'POST'
 
@@ -144,6 +175,78 @@ export default function LinksPage() {
     navigator.clipboard.writeText(text)
     alert('已複製！')
   }
+
+  // 批量刪除
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`確定要刪除選取的 ${selectedIds.size} 個短網址？`)) return
+    for (const id of selectedIds) {
+      await fetch(`/api/links/${id}`, { method: 'DELETE' })
+    }
+    setSelectedIds(new Set())
+    setCurrentPage(1)
+    fetchData()
+  }
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setSelectedIds(next)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedLinks.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(paginatedLinks.map(l => l.id)))
+    }
+  }
+
+  // UTM 產生器
+  const buildUtmUrl = (baseUrl: string) => {
+    const params = new URLSearchParams()
+    if (utmParams.source) params.set('utm_source', utmParams.source)
+    if (utmParams.medium) params.set('utm_medium', utmParams.medium)
+    if (utmParams.campaign) params.set('utm_campaign', utmParams.campaign)
+    if (utmParams.term) params.set('utm_term', utmParams.term)
+    if (utmParams.content) params.set('utm_content', utmParams.content)
+    const qs = params.toString()
+    if (!qs) return baseUrl
+    return baseUrl + (baseUrl.includes('?') ? '&' : '?') + qs
+  }
+
+  // 匯出 CSV
+  const handleExport = () => {
+    const header = '備註,網域,短碼,短網址,目標網址,標籤,啟用,總點擊,不重複點擊'
+    const rows = links.map(link => {
+      const domain = (link.domains as Domain)?.domain || ''
+      const fullUrl = buildShortUrl(domain, link.slug)
+      const stats = clickStats[link.id]
+      return [
+        link.name || '',
+        domain,
+        link.slug,
+        fullUrl,
+        link.target_url,
+        (link.tags || []).join(';'),
+        link.is_active ? '是' : '否',
+        stats?.total || 0,
+        stats?.unique || 0,
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    })
+    const csv = '\uFEFF' + header + '\n' + rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `短網址_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // 分頁計算
+  const totalPages = Math.ceil(links.length / perPage)
+  const paginatedLinks = links.slice((currentPage - 1) * perPage, currentPage * perPage)
 
   // QR Code 頁面
   const [qrLink, setQrLink] = useState<ShortLink | null>(null)
@@ -518,29 +621,48 @@ export default function LinksPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">🔗 短網址管理</h1>
-        <button
-          onClick={handleCreate}
-          className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 transition font-medium text-sm"
-        >
-          + 新增短網址
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            className="bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-200 transition font-medium text-sm"
+          >
+            📥 匯出 CSV
+          </button>
+          <button
+            onClick={handleCreate}
+            className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 transition font-medium text-sm"
+          >
+            + 新增短網址
+          </button>
+        </div>
       </div>
 
-      {/* 網域篩選 */}
-      {domains.length > 1 && (
-        <div className="mb-4">
-          <select
-            value={filterDomain}
-            onChange={e => setFilterDomain(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="">全部網域</option>
-            {domains.map(d => (
-              <option key={d.id} value={d.id}>{d.domain}</option>
-            ))}
-          </select>
+      {/* 篩選 + 批量操作 */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {domains.length > 1 && (
+            <select
+              value={filterDomain}
+              onChange={e => { setFilterDomain(e.target.value); setCurrentPage(1) }}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">全部網域</option>
+              {domains.map(d => (
+                <option key={d.id} value={d.id}>{d.domain}</option>
+              ))}
+            </select>
+          )}
+          <span className="text-sm text-gray-500">共 {links.length} 筆</span>
         </div>
-      )}
+        {selectedIds.size > 0 && (
+          <button
+            onClick={handleBatchDelete}
+            className="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm hover:bg-red-200 transition"
+          >
+            🗑️ 刪除選取的 {selectedIds.size} 筆
+          </button>
+        )}
+      </div>
 
       {/* 短網址列表 */}
       {links.length === 0 ? (
@@ -549,74 +671,189 @@ export default function LinksPage() {
           <p className="text-gray-500">尚未建立任何短網址</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {links.map(link => {
-            const domain = (link.domains as Domain)?.domain || ''
-            const fullUrl = buildShortUrl(domain, link.slug)
-            return (
-              <div key={link.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-sm transition">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`inline-block w-2 h-2 rounded-full ${link.is_active ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                      <span className="font-medium text-gray-800">{link.name || link.slug}</span>
-                      {link.use_ab_test && (
-                        <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">A/B</span>
+        <>
+          {/* 全選 */}
+          <div className="flex items-center gap-2 mb-2 px-1">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === paginatedLinks.length && paginatedLinks.length > 0}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            <span className="text-xs text-gray-500">全選本頁</span>
+          </div>
+
+          <div className="space-y-3">
+            {paginatedLinks.map(link => {
+              const domain = (link.domains as Domain)?.domain || ''
+              const fullUrl = buildShortUrl(domain, link.slug)
+              return (
+                <div key={link.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-sm transition">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(link.id)}
+                      onChange={() => toggleSelect(link.id)}
+                      className="w-4 h-4 rounded border-gray-300 mt-1 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`inline-block w-2 h-2 rounded-full ${link.is_active ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                        <span className="font-medium text-gray-800">{link.name || link.slug}</span>
+                        {link.use_ab_test && (
+                          <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">A/B</span>
+                        )}
+                      </div>
+                      <a href={fullUrl} target="_blank" rel="noopener" className="text-sm text-blue-800 hover:underline truncate block mb-1">
+                        {fullUrl}
+                      </a>
+                      <div className="text-xs text-gray-400 truncate">
+                        → {link.target_url}
+                      </div>
+                      {link.tags && link.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {link.tags.map((tag, i) => (
+                            <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                      {(clickStats[link.id]?.total ?? 0) > 0 && (
+                        <div className="flex gap-3 mt-1.5 text-xs text-gray-500">
+                          <span>👆 點擊 <strong className="text-gray-700">{clickStats[link.id].total}</strong> 次</span>
+                          <span>👤 不重複 <strong className="text-gray-700">{clickStats[link.id].unique}</strong></span>
+                        </div>
+                      )}
+
+                      {/* UTM 產生器 */}
+                      {showUtm === link.id && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
+                            <input
+                              type="text" placeholder="utm_source（如 facebook）" value={utmParams.source}
+                              onChange={e => setUtmParams({ ...utmParams, source: e.target.value })}
+                              className="px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            />
+                            <input
+                              type="text" placeholder="utm_medium（如 post）" value={utmParams.medium}
+                              onChange={e => setUtmParams({ ...utmParams, medium: e.target.value })}
+                              className="px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            />
+                            <input
+                              type="text" placeholder="utm_campaign（如 母親節）" value={utmParams.campaign}
+                              onChange={e => setUtmParams({ ...utmParams, campaign: e.target.value })}
+                              className="px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            />
+                            <input
+                              type="text" placeholder="utm_term（選填）" value={utmParams.term}
+                              onChange={e => setUtmParams({ ...utmParams, term: e.target.value })}
+                              className="px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            />
+                            <input
+                              type="text" placeholder="utm_content（選填）" value={utmParams.content}
+                              onChange={e => setUtmParams({ ...utmParams, content: e.target.value })}
+                              className="px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-white px-2 py-1.5 rounded border text-xs text-gray-600 truncate">
+                              {buildUtmUrl(link.target_url)}
+                            </div>
+                            <button
+                              onClick={() => {
+                                const utmUrl = buildUtmUrl(link.target_url)
+                                copyToClipboard(utmUrl)
+                              }}
+                              className="text-xs px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 transition whitespace-nowrap"
+                            >
+                              複製帶 UTM 網址
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">💡 複製後貼到目標網址欄位，就能在 GA4 追蹤來源。</p>
+                        </div>
                       )}
                     </div>
-                    <a href={fullUrl} target="_blank" rel="noopener" className="text-sm text-blue-800 hover:underline truncate block mb-1">
-                      {fullUrl}
-                    </a>
-                    <div className="text-xs text-gray-400 truncate">
-                      → {link.target_url}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => copyToClipboard(fullUrl)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+                      >
+                        複製
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (showUtm === link.id) { setShowUtm(null) } else {
+                            setShowUtm(link.id)
+                            setUtmParams({ source: '', medium: '', campaign: '', term: '', content: '' })
+                          }
+                        }}
+                        className={`text-xs px-3 py-1.5 rounded-lg transition ${showUtm === link.id ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                      >
+                        UTM
+                      </button>
+                      <button
+                        onClick={() => showQr(link)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+                      >
+                        QR
+                      </button>
+                      <button
+                        onClick={() => handleToggleActive(link)}
+                        className={`text-xs px-3 py-1.5 rounded-lg transition ${
+                          link.is_active ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}
+                      >
+                        {link.is_active ? '啟用中' : '已停用'}
+                      </button>
+                      <button
+                        onClick={() => handleEdit(link)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
+                      >
+                        編輯
+                      </button>
+                      <button
+                        onClick={() => handleDelete(link.id)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition"
+                      >
+                        刪除
+                      </button>
                     </div>
-                    {link.tags && link.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {link.tags.map((tag, i) => (
-                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => copyToClipboard(fullUrl)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
-                    >
-                      複製
-                    </button>
-                    <button
-                      onClick={() => showQr(link)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
-                    >
-                      QR
-                    </button>
-                    <button
-                      onClick={() => handleToggleActive(link)}
-                      className={`text-xs px-3 py-1.5 rounded-lg transition ${
-                        link.is_active ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
-                    >
-                      {link.is_active ? '啟用中' : '已停用'}
-                    </button>
-                    <button
-                      onClick={() => handleEdit(link)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                    >
-                      編輯
-                    </button>
-                    <button
-                      onClick={() => handleDelete(link.id)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition"
-                    >
-                      刪除
-                    </button>
                   </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+
+          {/* 分頁 */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg text-sm border border-gray-300 disabled:opacity-40 hover:bg-gray-50 transition"
+              >
+                ← 上一頁
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-8 h-8 rounded-lg text-sm transition ${
+                    page === currentPage ? 'bg-red-600 text-white' : 'border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg text-sm border border-gray-300 disabled:opacity-40 hover:bg-gray-50 transition"
+              >
+                下一頁 →
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
