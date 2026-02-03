@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 import { selectTargetByWeight } from '@/lib/utils'
 
 export async function GET(
@@ -22,7 +22,7 @@ export async function GET(
   // 短網址重定向
   const shortCode = firstSegment
 
-  const { data: link } = await supabase
+  const { data: link } = await supabaseAdmin
     .from('short_links')
     .select(`*, domains!inner(domain), link_targets(*)`)
     .eq('domains.domain', host)
@@ -46,7 +46,7 @@ export async function GET(
 
 // ===== Bio 頁面渲染 =====
 async function handleBioPage(host: string, bioSlug: string) {
-  const { data: page } = await supabase
+  const { data: page } = await supabaseAdmin
     .from('bio_pages')
     .select(`*, domains!inner(domain), bio_links(*)`)
     .eq('domains.domain', host)

@@ -564,9 +564,9 @@ export default function LinksPage() {
                         <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">A/B</span>
                       )}
                     </div>
-                    <div className="text-sm text-blue-800 truncate mb-1">
+                    <a href={fullUrl} target="_blank" rel="noopener" className="text-sm text-blue-800 hover:underline truncate block mb-1">
                       {fullUrl}
-                    </div>
+                    </a>
                     <div className="text-xs text-gray-400 truncate">
                       → {link.target_url}
                     </div>
