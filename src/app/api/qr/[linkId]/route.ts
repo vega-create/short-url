@@ -39,9 +39,36 @@ export async function GET(
     errorCorrectionLevel: 'H', // 高容錯，才能放 Logo
     color: {
       dark: settings.fg_color || '#000000',
-      light: settings.bg_color || '#ffffff',
+      light: settings.bg_image_url ? '#00000000' : (settings.bg_color || '#ffffff'),
     },
   })
+
+  let composited = qrBuffer
+
+  // 有背景圖片時，把 QR Code 疊在背景圖上
+  if (settings.bg_image_url) {
+    try {
+      const bgResponse = await fetch(settings.bg_image_url)
+      const bgArrayBuffer = await bgResponse.arrayBuffer()
+      const bgBuffer = await sharp(Buffer.from(bgArrayBuffer))
+        .resize(size, size, { fit: 'cover' })
+        .png()
+        .toBuffer()
+
+      // QR Code 加半透明效果讓背景可見
+      const qrWithAlpha = await sharp(qrBuffer)
+        .ensureAlpha()
+        .png()
+        .toBuffer()
+
+      composited = await sharp(bgBuffer)
+        .composite([{ input: qrWithAlpha, gravity: 'center' }])
+        .png()
+        .toBuffer()
+    } catch {
+      // 背景圖載入失敗，用純色
+    }
+  }
 
   // 如果有 Logo，合成到中央
   if (settings.logo_url) {
@@ -64,7 +91,7 @@ export async function GET(
 
       const bgBuffer = await sharp(Buffer.from(bgSvg)).png().toBuffer()
 
-      const final = await sharp(qrBuffer)
+      const final = await sharp(composited)
         .composite([
           { input: bgBuffer, gravity: 'center' },
           { input: logo, gravity: 'center' },
@@ -103,7 +130,7 @@ export async function GET(
     })
   }
 
-  return new NextResponse(new Uint8Array(qrBuffer), {
+  return new NextResponse(new Uint8Array(composited), {
     headers: {
       'Content-Type': 'image/png',
       'Cache-Control': 'public, max-age=3600',

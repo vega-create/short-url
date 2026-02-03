@@ -250,7 +250,8 @@ export default function LinksPage() {
 
   // QR Code 頁面
   const [qrLink, setQrLink] = useState<ShortLink | null>(null)
-  const [qrSettings, setQrSettings] = useState({ fg_color: '#000000', bg_color: '#ffffff', logo_url: '' })
+  const [qrSettings, setQrSettings] = useState({ fg_color: '#000000', bg_color: '#ffffff', logo_url: '', bg_image_url: '' })
+  const [uploading, setUploading] = useState(false)
 
   const showQr = async (link: ShortLink) => {
     const res = await fetch(`/api/links/${link.id}`)
@@ -258,11 +259,31 @@ export default function LinksPage() {
     setQrLink(data)
     const qs = Array.isArray(data.qr_settings) ? data.qr_settings[0] : data.qr_settings
     if (qs) {
-      setQrSettings({ fg_color: qs.fg_color || '#000000', bg_color: qs.bg_color || '#ffffff', logo_url: qs.logo_url || '' })
+      setQrSettings({ fg_color: qs.fg_color || '#000000', bg_color: qs.bg_color || '#ffffff', logo_url: qs.logo_url || '', bg_image_url: qs.bg_image_url || '' })
     } else {
-      setQrSettings({ fg_color: '#000000', bg_color: '#ffffff', logo_url: '' })
+      setQrSettings({ fg_color: '#000000', bg_color: '#ffffff', logo_url: '', bg_image_url: '' })
     }
     setViewMode('qr')
+  }
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'logo_url' | 'bg_image_url') => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (data.url) {
+        setQrSettings(prev => ({ ...prev, [field]: data.url }))
+      } else {
+        alert('上傳失敗：' + (data.error || '未知錯誤'))
+      }
+    } catch {
+      alert('上傳失敗')
+    }
+    setUploading(false)
   }
 
   const saveQrSettings = async () => {
@@ -354,15 +375,53 @@ export default function LinksPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Logo 圖片網址</label>
-                <input
-                  type="text"
-                  value={qrSettings.logo_url}
-                  onChange={e => setQrSettings({ ...qrSettings, logo_url: e.target.value })}
-                  placeholder="https://example.com/logo.png"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Logo 圖片</label>
+                <div className="flex gap-2 items-center mb-1">
+                  <input
+                    type="text"
+                    value={qrSettings.logo_url}
+                    onChange={e => setQrSettings({ ...qrSettings, logo_url: e.target.value })}
+                    placeholder="貼上圖片網址或上傳"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                  <label className={`px-3 py-2 rounded-lg text-sm cursor-pointer transition whitespace-nowrap ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    {uploading ? '上傳中...' : '📁 上傳'}
+                    <input type="file" accept="image/*" className="hidden" onChange={e => handleUpload(e, 'logo_url')} disabled={uploading} />
+                  </label>
+                </div>
+                {qrSettings.logo_url && (
+                  <div className="flex items-center gap-2 mt-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={qrSettings.logo_url} alt="Logo" className="w-8 h-8 rounded object-cover" />
+                    <button onClick={() => setQrSettings({ ...qrSettings, logo_url: '' })} className="text-xs text-red-500 hover:text-red-700">移除</button>
+                  </div>
+                )}
                 <p className="text-xs text-gray-400 mt-1">Logo 會顯示在 QR Code 中央</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">背景底圖</label>
+                <div className="flex gap-2 items-center mb-1">
+                  <input
+                    type="text"
+                    value={qrSettings.bg_image_url}
+                    onChange={e => setQrSettings({ ...qrSettings, bg_image_url: e.target.value })}
+                    placeholder="貼上圖片網址或上傳"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                  <label className={`px-3 py-2 rounded-lg text-sm cursor-pointer transition whitespace-nowrap ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    {uploading ? '上傳中...' : '📁 上傳'}
+                    <input type="file" accept="image/*" className="hidden" onChange={e => handleUpload(e, 'bg_image_url')} disabled={uploading} />
+                  </label>
+                </div>
+                {qrSettings.bg_image_url && (
+                  <div className="flex items-center gap-2 mt-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={qrSettings.bg_image_url} alt="背景圖" className="w-12 h-12 rounded object-cover" />
+                    <button onClick={() => setQrSettings({ ...qrSettings, bg_image_url: '' })} className="text-xs text-red-500 hover:text-red-700">移除</button>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-1">QR Code 會疊在這張底圖上（設定後背景色會被忽略）</p>
               </div>
 
               <button
