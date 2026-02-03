@@ -10,7 +10,7 @@ export async function GET(
   const host = request.headers.get('host') || ''
   const [firstSegment] = slug.map(s => decodeURIComponent(s))
 
-  if (firstSegment === 'admin' || firstSegment === 'api') {
+  if (firstSegment === 'vega888admin' || firstSegment === 'admin' || firstSegment === 'api') {
     return NextResponse.next()
   }
 
@@ -95,6 +95,7 @@ async function handleBioPage(host: string, bioSlug: string) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${esc(page.title || 'Links')}</title>
+  <meta name="robots" content="noindex, nofollow">
   <meta name="description" content="${esc(page.bio || '')}">
   <meta property="og:title" content="${esc(page.title || 'Links')}">
   <meta property="og:description" content="${esc(page.bio || '')}">

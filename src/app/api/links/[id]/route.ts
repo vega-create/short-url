@@ -33,7 +33,7 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
-  const { slug, name, target_url, is_active, use_ab_test, pixel_id, gtm_id, ga_id } = body
+  const { slug, name, target_url, is_active, use_ab_test, pixel_id, gtm_id, ga_id, tags } = body
 
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (slug !== undefined) updateData.slug = slug.trim()
@@ -44,6 +44,7 @@ export async function PUT(
   if (pixel_id !== undefined) updateData.pixel_id = pixel_id
   if (gtm_id !== undefined) updateData.gtm_id = gtm_id
   if (ga_id !== undefined) updateData.ga_id = ga_id
+  if (tags !== undefined) updateData.tags = tags
 
   const { data, error } = await supabaseAdmin
     .from('short_links')

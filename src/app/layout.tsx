@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "短網址管理系統",
   description: "智慧媽咪短網址管理系統",
+  robots: { index: false, follow: false },
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',

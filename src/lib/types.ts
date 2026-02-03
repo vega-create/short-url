@@ -18,6 +18,7 @@ export interface ShortLink {
   pixel_id: string | null
   gtm_id: string | null
   ga_id: string | null
+  tags: string[]
   created_at: string
   updated_at: string
   // Joined

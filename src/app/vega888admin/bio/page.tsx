@@ -165,7 +165,7 @@ export default function BioManagePage() {
         <div className="text-5xl mb-4">🌐</div>
         <h2 className="text-xl font-semibold text-gray-800 mb-2">尚未設定網域</h2>
         <p className="text-gray-500 mb-4">請先新增至少一個網域</p>
-        <a href="/admin/domains" className="inline-block bg-red-600 text-white px-6 py-2.5 rounded-lg hover:bg-red-700 transition font-medium text-sm">
+        <a href="/vega888admin/domains" className="inline-block bg-red-600 text-white px-6 py-2.5 rounded-lg hover:bg-red-700 transition font-medium text-sm">
           前往設定網域
         </a>
       </div>

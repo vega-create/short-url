@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { domain_id, slug, name, target_url, pixel_id, gtm_id, ga_id } = body
+  const { domain_id, slug, name, target_url, pixel_id, gtm_id, ga_id, tags } = body
 
   if (!domain_id || !slug || !target_url) {
     return NextResponse.json(
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       pixel_id,
       gtm_id,
       ga_id,
+      tags: tags || [],
     })
     .select('*, domains(domain)')
     .single()

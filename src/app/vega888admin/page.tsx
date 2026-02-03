@@ -30,9 +30,9 @@ export default function AdminDashboard() {
   }, [])
 
   const cards = [
-    { label: '網域數量', value: stats.domains, icon: '🌐', href: '/admin/domains', color: 'bg-red-50 text-red-700' },
-    { label: '短網址數量', value: stats.links, icon: '🔗', href: '/admin/links', color: 'bg-emerald-50 text-emerald-700' },
-    { label: 'Bio 頁面', value: stats.bioPages, icon: '📄', href: '/admin/bio', color: 'bg-violet-50 text-violet-700' },
+    { label: '網域數量', value: stats.domains, icon: '🌐', href: '/vega888admin/domains', color: 'bg-red-50 text-red-700' },
+    { label: '短網址數量', value: stats.links, icon: '🔗', href: '/vega888admin/links', color: 'bg-emerald-50 text-emerald-700' },
+    { label: 'Bio 頁面', value: stats.bioPages, icon: '📄', href: '/vega888admin/bio', color: 'bg-violet-50 text-violet-700' },
   ]
 
   return (
@@ -63,28 +63,28 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">快速開始</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Link href="/admin/domains" className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+              <Link href="/vega888admin/domains" className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
                 <span className="text-2xl">🌐</span>
                 <div>
                   <div className="font-medium text-gray-800">新增網域</div>
                   <div className="text-sm text-gray-500">設定你的自訂網域或子網域</div>
                 </div>
               </Link>
-              <Link href="/admin/links" className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+              <Link href="/vega888admin/links" className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
                 <span className="text-2xl">🔗</span>
                 <div>
                   <div className="font-medium text-gray-800">建立短網址</div>
                   <div className="text-sm text-gray-500">建立新的短網址並設定目標</div>
                 </div>
               </Link>
-              <Link href="/admin/bio" className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+              <Link href="/vega888admin/bio" className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
                 <span className="text-2xl">📄</span>
                 <div>
                   <div className="font-medium text-gray-800">建立 Bio 頁面</div>
                   <div className="text-sm text-gray-500">建立連結收集頁面</div>
                 </div>
               </Link>
-              <Link href="/admin/links" className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+              <Link href="/vega888admin/links" className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
                 <span className="text-2xl">📱</span>
                 <div>
                   <div className="font-medium text-gray-800">QR Code</div>

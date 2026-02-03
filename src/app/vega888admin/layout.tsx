@@ -69,10 +69,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const navItems = [
-    { href: '/admin', label: '📊 總覽', exact: true },
-    { href: '/admin/domains', label: '🌐 網域管理' },
-    { href: '/admin/links', label: '🔗 短網址管理' },
-    { href: '/admin/bio', label: '📄 Bio 頁面' },
+    { href: '/vega888admin', label: '📊 總覽', exact: true },
+    { href: '/vega888admin/domains', label: '🌐 網域管理' },
+    { href: '/vega888admin/links', label: '🔗 短網址管理' },
+    { href: '/vega888admin/bio', label: '📄 Bio 頁面' },
   ]
 
   return (
@@ -82,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-8">
-              <Link href="/admin" className="text-xl font-bold text-gray-800">
+              <Link href="/vega888admin" className="text-xl font-bold text-gray-800">
                 🔗 短網址系統
               </Link>
               <nav className="hidden md:flex gap-1">
