@@ -45,6 +45,9 @@ export default function AnalyticsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const perPage = 20
 
+  // 批量選取
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     const [logsRes, linksRes] = await Promise.all([
@@ -157,18 +160,71 @@ export default function AnalyticsPage() {
     })
   }
 
+  // 批量刪除
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setSelectedIds(next)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedLogs.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(paginatedLogs.map(l => l.id)))
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`確定要刪除選取的 ${selectedIds.size} 筆點擊記錄？`)) return
+    await fetch('/api/analytics', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: Array.from(selectedIds) }),
+    })
+    setSelectedIds(new Set())
+    fetchData()
+  }
+
+  const handleDeleteFiltered = async () => {
+    if (filteredLogs.length === 0) return
+    if (!confirm(`確定要刪除篩選出的全部 ${filteredLogs.length} 筆點擊記錄？`)) return
+    const ids = filteredLogs.map(l => l.id)
+    // 分批刪除（每批 200 筆）
+    for (let i = 0; i < ids.length; i += 200) {
+      await fetch('/api/analytics', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids.slice(i, i + 200) }),
+      })
+    }
+    setSelectedIds(new Set())
+    fetchData()
+  }
+
   if (loading) return <div className="text-gray-500">載入中...</div>
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">📊 點擊分析</h1>
-        <button
-          onClick={handleExport}
-          className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 transition font-medium text-sm"
-        >
-          📥 匯出 CSV
-        </button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={handleBatchDelete}
+              className="bg-red-100 text-red-700 px-4 py-2.5 rounded-lg hover:bg-red-200 transition font-medium text-sm"
+            >
+              🗑️ 刪除選取 {selectedIds.size} 筆
+            </button>
+          )}
+          <button
+            onClick={handleExport}
+            className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 transition font-medium text-sm"
+          >
+            📥 匯出 CSV
+          </button>
+        </div>
       </div>
 
       {/* 統計摘要 */}
@@ -332,11 +388,41 @@ export default function AnalyticsPage() {
         </div>
       ) : (
         <>
+          {/* 批量操作列 */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleBatchDelete}
+                  className="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm hover:bg-red-200 transition font-medium"
+                >
+                  🗑️ 刪除選取 {selectedIds.size} 筆
+                </button>
+              )}
+              {(filterLink || filterDevice || searchParam || filterDateFrom || filterDateTo) && filteredLogs.length > 0 && (
+                <button
+                  onClick={handleDeleteFiltered}
+                  className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm hover:bg-red-100 transition"
+                >
+                  🗑️ 刪除篩選結果全部 {filteredLogs.length} 筆
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-3 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={paginatedLogs.length > 0 && paginatedLogs.every(l => selectedIds.has(l.id))}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                    </th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">時間</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">短網址</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">路徑參數</th>
@@ -347,7 +433,15 @@ export default function AnalyticsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginatedLogs.map(log => (
-                    <tr key={log.id} className="hover:bg-gray-50 transition">
+                    <tr key={log.id} className={`hover:bg-gray-50 transition ${selectedIds.has(log.id) ? 'bg-red-50' : ''}`}>
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(log.id)}
+                          onChange={() => toggleSelect(log.id)}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                      </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatTime(log.clicked_at)}</td>
                       <td className="px-4 py-3">
                         <span className="text-gray-800">{getLinkName(log.short_link_id)}</span>
