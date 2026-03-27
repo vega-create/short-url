@@ -117,9 +117,9 @@ export default function AdminDashboard() {
                     <p>到「🌐 網域管理」新增你要使用的網域或子網域。</p>
                     <p className="font-medium text-gray-800 mt-2">支援格式：</p>
                     <div className="bg-white rounded p-3 font-mono text-xs space-y-1">
-                      <div>go.smartmommy.com <span className="text-gray-400 ml-2">← 子網域</span></div>
+                      <div>go.mommywisdom.com <span className="text-gray-400 ml-2">← 子網域</span></div>
                       <div>link.yoursite.com <span className="text-gray-400 ml-2">← 子網域</span></div>
-                      <div>smartmommy.link <span className="text-gray-400 ml-2">← 主網域</span></div>
+                      <div>mommywisdom.link <span className="text-gray-400 ml-2">← 主網域</span></div>
                     </div>
                     <p className="font-medium text-gray-800 mt-3">DNS 設定（到你的 DNS 服務商操作）：</p>
                     <div className="bg-white rounded p-3 font-mono text-xs">
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="bg-white rounded p-3 mt-3 text-xs">
                       <div className="font-medium text-gray-800 mb-1">範例：</div>
-                      <div className="font-mono">go.smartmommy.com/<strong>母親節</strong> → https://your-landing-page.com</div>
+                      <div className="font-mono">go.mommywisdom.com/<strong>母親節</strong> → https://your-landing-page.com</div>
                     </div>
                     <p className="text-gray-500 mt-2">💡 目標網址隨時可以換，已發出去的短網址和 QR Code 都不用改！</p>
                   </div>
@@ -165,10 +165,10 @@ export default function AdminDashboard() {
                   <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm text-gray-700">
                     <p>短網址後面可以<strong>隨意加上斜線和文字</strong>，全部都會導向同一個目標。用來區分不同渠道的流量來源。</p>
                     <div className="bg-white rounded p-3 font-mono text-xs space-y-1 mt-2">
-                      <div>go.smartmommy.com/母親節<span className="text-emerald-600 font-bold">/FB</span></div>
-                      <div>go.smartmommy.com/母親節<span className="text-emerald-600 font-bold">/IG/限動</span></div>
-                      <div>go.smartmommy.com/母親節<span className="text-emerald-600 font-bold">/LINE/群組</span></div>
-                      <div>go.smartmommy.com/母親節<span className="text-emerald-600 font-bold">/KOL/某網紅</span></div>
+                      <div>go.mommywisdom.com/母親節<span className="text-emerald-600 font-bold">/FB</span></div>
+                      <div>go.mommywisdom.com/母親節<span className="text-emerald-600 font-bold">/IG/限動</span></div>
+                      <div>go.mommywisdom.com/母親節<span className="text-emerald-600 font-bold">/LINE/群組</span></div>
+                      <div>go.mommywisdom.com/母親節<span className="text-emerald-600 font-bold">/KOL/某網紅</span></div>
                       <div className="text-gray-400 mt-2">↑ 全部導向同一個目標網址</div>
                     </div>
                     <p className="text-gray-500 mt-2">系統只看第一段「母親節」來配對，後面的參數不影響導向。在 GA4 中可以用 Page Path 來分辨各渠道的流量。</p>
@@ -235,7 +235,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="bg-white rounded p-3 mt-2 text-xs">
                       <div className="font-medium text-gray-800 mb-1">Bio 頁面網址格式：</div>
-                      <div className="font-mono">go.smartmommy.com/<strong>@links</strong></div>
+                      <div className="font-mono">go.mommywisdom.com/<strong>@links</strong></div>
                       <div className="text-gray-400 mt-1">路徑前面加 @ 就是 Bio 頁面</div>
                     </div>
                   </div>
@@ -251,7 +251,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <p className="font-medium text-gray-800 text-sm">Q：短碼可以用中文嗎？</p>
-                      <p className="text-sm text-gray-600 mt-1">A：可以！例如 go.smartmommy.com/母親節 完全沒問題。</p>
+                      <p className="text-sm text-gray-600 mt-1">A：可以！例如 go.mommywisdom.com/母親節 完全沒問題。</p>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <p className="font-medium text-gray-800 text-sm">Q：一個網域可以建多少短網址？</p>

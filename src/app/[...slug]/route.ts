@@ -235,8 +235,20 @@ async function handleBioPage(host: string, bioSlug: string) {
     bgGradient: '',
     bgImage: '',
     bgOverlay: 'rgba(0,0,0,0.3)',
+    fontFamily: 'Noto Sans TC',
     ...page.theme,
   }
+
+  // 字型對應 Google Fonts import
+  const fontImports: Record<string, string> = {
+    'Noto Sans TC': 'Noto+Sans+TC:wght@400;500;700',
+    'Noto Serif TC': 'Noto+Serif+TC:wght@400;500;700',
+    'Nunito': 'Nunito:wght@400;600;700',
+    'Kalam': 'Kalam:wght@400;700',
+    'Playfair Display': 'Playfair+Display:wght@400;700',
+    'Poppins': 'Poppins:wght@400;500;700',
+  }
+  const fontImport = fontImports[t.fontFamily] || fontImports['Noto Sans TC']
 
   const activeLinks = (page.bio_links || [])
     .filter((l: { is_active: boolean }) => l.is_active)
@@ -270,12 +282,12 @@ async function handleBioPage(host: string, bioSlug: string) {
   <meta property="og:description" content="${esc(page.bio || '')}">
   ${page.logo_url ? `<meta property="og:image" content="${esc(page.logo_url)}">` : ''}
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=${fontImport}&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Noto Sans TC', -apple-system, sans-serif;
+      font-family: '${esc(t.fontFamily)}', -apple-system, sans-serif;
       ${bodyBg}
       color: ${t.textColor};
       min-height: 100vh;
@@ -400,7 +412,7 @@ async function handleBioPage(host: string, bioSlug: string) {
     ${page.title ? `<h1 class="title">${esc(page.title)}</h1>` : ''}
     ${page.bio ? `<p class="bio-text">${esc(page.bio)}</p>` : ''}
     <div class="links">${linksHtml}</div>
-    <div class="footer">Powered by SmartMommy</div>
+    <div class="footer">Powered by MommyWisdom</div>
   </div>
 </body>
 </html>`

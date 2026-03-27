@@ -27,11 +27,12 @@ export default function BioManagePage() {
       bgGradient: '',
       bgImage: '',
       bgOverlay: 'rgba(0,0,0,0.3)',
+      fontFamily: 'Noto Sans TC' as string,
     },
   })
   const [formError, setFormError] = useState('')
   const [links, setLinks] = useState<BioLink[]>([])
-  const [newLink, setNewLink] = useState({ title: '', url: '', icon: '' })
+  const [newLink, setNewLink] = useState({ title: '', url: '', icon: '', utm_source: '', utm_medium: '', utm_campaign: '' })
 
   const fetchData = useCallback(async () => {
     const [domainsRes, pagesRes] = await Promise.all([
@@ -48,7 +49,7 @@ export default function BioManagePage() {
   const resetForm = () => {
     setForm({
       domain_id: domains[0]?.id || '', slug: '', title: '', bio: '', logo_url: '',
-      theme: { bgColor: '#ffffff', textColor: '#000000', buttonColor: '#000000', buttonTextColor: '#ffffff', buttonStyle: 'rounded', bgGradient: '', bgImage: '', bgOverlay: 'rgba(0,0,0,0.3)' },
+      theme: { bgColor: '#ffffff', textColor: '#000000', buttonColor: '#000000', buttonTextColor: '#ffffff', buttonStyle: 'rounded', bgGradient: '', bgImage: '', bgOverlay: 'rgba(0,0,0,0.3)', fontFamily: 'Noto Sans TC' },
     })
     setLinks([])
     setFormError('')
@@ -70,7 +71,7 @@ export default function BioManagePage() {
       title: data.title || '',
       bio: data.bio || '',
       logo_url: data.logo_url || '',
-      theme: { bgColor: '#ffffff', textColor: '#000000', buttonColor: '#000000', buttonTextColor: '#ffffff', buttonStyle: 'rounded', bgGradient: '', bgImage: '', bgOverlay: 'rgba(0,0,0,0.3)', ...data.theme },
+      theme: { bgColor: '#ffffff', textColor: '#000000', buttonColor: '#000000', buttonTextColor: '#ffffff', buttonStyle: 'rounded', bgGradient: '', bgImage: '', bgOverlay: 'rgba(0,0,0,0.3)', fontFamily: 'Noto Sans TC', ...data.theme },
     })
     setLinks(data.bio_links || [])
     setViewMode('edit')
@@ -122,7 +123,7 @@ export default function BioManagePage() {
     if (res.ok) {
       const data = await res.json()
       setLinks([...links, data])
-      setNewLink({ title: '', url: '', icon: '' })
+      setNewLink({ title: '', url: '', icon: '', utm_source: '', utm_medium: '', utm_campaign: '' })
     }
   }
 
@@ -143,6 +144,18 @@ export default function BioManagePage() {
       setLinks(links.map(l => l.id === link.id ? { ...l, is_active: !l.is_active } : l))
     }
   }
+
+  const [copied, setCopied] = useState(false)
+
+  // 字型選項
+  const fontPresets = [
+    { label: '思源黑體', value: 'Noto Sans TC', import: 'Noto+Sans+TC:wght@400;500;700' },
+    { label: '思源宋體', value: 'Noto Serif TC', import: 'Noto+Serif+TC:wght@400;500;700' },
+    { label: '圓體', value: 'Nunito', import: 'Nunito:wght@400;600;700' },
+    { label: '手寫風', value: 'Kalam', import: 'Kalam:wght@400;700' },
+    { label: 'Playfair', value: 'Playfair Display', import: 'Playfair+Display:wght@400;700' },
+    { label: 'Poppins', value: 'Poppins', import: 'Poppins:wght@400;500;700' },
+  ]
 
   // 預設漸層方案
   const gradientPresets = [
@@ -206,7 +219,16 @@ export default function BioManagePage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">路徑 *</label>
                     <input type="text" value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} placeholder="links" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                    {previewUrl && <p className="text-xs text-gray-400 mt-1">{previewUrl}</p>}
+                    {previewUrl && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <p className="text-xs text-gray-400">{previewUrl}</p>
+                        {isEdit && (
+                          <button type="button" onClick={() => { navigator.clipboard.writeText(previewUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="text-xs text-red-500 hover:text-red-700">
+                            {copied ? '✅ 已複製' : '📋 複製'}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -282,6 +304,24 @@ export default function BioManagePage() {
               <h3 className="text-md font-semibold text-gray-800 mt-6 mb-3">✏️ 文字 & 按鈕</h3>
 
               <div className="space-y-4">
+                {/* 字型選擇 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">字型</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {fontPresets.map(f => (
+                      <button
+                        type="button"
+                        key={f.value}
+                        onClick={() => setForm({ ...form, theme: { ...form.theme, fontFamily: f.value } })}
+                        className={`p-2 rounded-lg text-center border-2 transition ${form.theme.fontFamily === f.value ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                        <div className="text-base mb-0.5" style={{ fontFamily: f.value }}>Aa 字</div>
+                        <div className="text-xs text-gray-500">{f.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-2">
                     <input type="color" value={form.theme.textColor} onChange={e => setForm({ ...form, theme: { ...form.theme, textColor: e.target.value } })} className="w-8 h-8 rounded cursor-pointer" />
@@ -350,6 +390,12 @@ export default function BioManagePage() {
                       + 新增
                     </button>
                   </div>
+                  <div className="flex gap-2">
+                    <input type="text" value={newLink.utm_source} onChange={e => setNewLink({ ...newLink, utm_source: e.target.value })} placeholder="utm_source" className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs" />
+                    <input type="text" value={newLink.utm_medium} onChange={e => setNewLink({ ...newLink, utm_medium: e.target.value })} placeholder="utm_medium" className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs" />
+                    <input type="text" value={newLink.utm_campaign} onChange={e => setNewLink({ ...newLink, utm_campaign: e.target.value })} placeholder="utm_campaign" className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs" />
+                  </div>
+                  <p className="text-xs text-gray-400">UTM 選填，填了會自動附加到目標網址</p>
                 </div>
               </div>
             )}
@@ -364,7 +410,7 @@ export default function BioManagePage() {
                   <div className="absolute inset-0 rounded-[2rem]" style={{ backgroundColor: form.theme.bgOverlay }} />
                 )}
 
-                <div className="relative p-6 pt-10 text-center">
+                <div className="relative p-6 pt-10 text-center" style={{ fontFamily: `'${form.theme.fontFamily}', sans-serif` }}>
                   {form.logo_url && (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={form.logo_url} alt="Logo" className="w-20 h-20 rounded-full mx-auto mb-3 object-cover shadow-lg border-2 border-white/30" />

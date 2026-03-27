@@ -23,12 +23,24 @@ export async function POST(
     .limit(1)
     .single()
 
+  // 附加 UTM 到 URL
+  let finalUrl = body.url
+  if (body.utm_source || body.utm_medium || body.utm_campaign) {
+    try {
+      const urlObj = new URL(finalUrl)
+      if (body.utm_source) urlObj.searchParams.set('utm_source', body.utm_source)
+      if (body.utm_medium) urlObj.searchParams.set('utm_medium', body.utm_medium)
+      if (body.utm_campaign) urlObj.searchParams.set('utm_campaign', body.utm_campaign)
+      finalUrl = urlObj.toString()
+    } catch { /* URL 格式有問題就不加 */ }
+  }
+
   const { data, error } = await supabaseAdmin
     .from('bio_links')
     .insert({
       bio_page_id: id,
       title: body.title,
-      url: body.url,
+      url: finalUrl,
       icon: body.icon,
       sort_order: (maxOrder?.sort_order || 0) + 1,
     })
