@@ -34,7 +34,7 @@ export default function BioManagePage() {
   const [links, setLinks] = useState<BioLink[]>([])
   const [newLink, setNewLink] = useState({ title: '', url: '', icon: '', utm_source: '', utm_medium: '', utm_campaign: '' })
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null)
-  const [editLink, setEditLink] = useState({ title: '', url: '', icon: '' })
+  const [editLink, setEditLink] = useState({ title: '', url: '', icon: '', utm_source: '', utm_medium: '', utm_campaign: '' })
 
   const fetchData = useCallback(async () => {
     const [domainsRes, pagesRes] = await Promise.all([
@@ -137,13 +137,28 @@ export default function BioManagePage() {
 
   const handleSaveLink = async (linkId: string) => {
     if (!editingPage) return
+    // 附加 UTM 到 URL
+    let finalUrl = editLink.url
+    if (editLink.utm_source || editLink.utm_medium || editLink.utm_campaign) {
+      try {
+        const urlObj = new URL(finalUrl)
+        // 先清除舊的 UTM
+        urlObj.searchParams.delete('utm_source')
+        urlObj.searchParams.delete('utm_medium')
+        urlObj.searchParams.delete('utm_campaign')
+        if (editLink.utm_source) urlObj.searchParams.set('utm_source', editLink.utm_source)
+        if (editLink.utm_medium) urlObj.searchParams.set('utm_medium', editLink.utm_medium)
+        if (editLink.utm_campaign) urlObj.searchParams.set('utm_campaign', editLink.utm_campaign)
+        finalUrl = urlObj.toString()
+      } catch { /* ignore */ }
+    }
     const res = await fetch(`/api/bio/${editingPage.id}/links/${linkId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: editLink.title, url: editLink.url, icon: editLink.icon }),
+      body: JSON.stringify({ title: editLink.title, url: finalUrl, icon: editLink.icon }),
     })
     if (res.ok) {
-      setLinks(links.map(l => l.id === linkId ? { ...l, ...editLink } : l))
+      setLinks(links.map(l => l.id === linkId ? { ...l, title: editLink.title, url: finalUrl, icon: editLink.icon } : l))
       setEditingLinkId(null)
     }
   }
@@ -403,6 +418,11 @@ export default function BioManagePage() {
                             </div>
                             <input type="url" value={editLink.url} onChange={e => setEditLink({ ...editLink, url: e.target.value })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
                             <div className="flex gap-2">
+                              <input type="text" value={editLink.utm_source} onChange={e => setEditLink({ ...editLink, utm_source: e.target.value })} placeholder="utm_source" className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs" />
+                              <input type="text" value={editLink.utm_medium} onChange={e => setEditLink({ ...editLink, utm_medium: e.target.value })} placeholder="utm_medium" className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs" />
+                              <input type="text" value={editLink.utm_campaign} onChange={e => setEditLink({ ...editLink, utm_campaign: e.target.value })} placeholder="utm_campaign" className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs" />
+                            </div>
+                            <div className="flex gap-2">
                               <button onClick={() => handleSaveLink(link.id)} className="text-xs px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">儲存</button>
                               <button onClick={() => setEditingLinkId(null)} className="text-xs px-3 py-1 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300">取消</button>
                             </div>
@@ -414,7 +434,23 @@ export default function BioManagePage() {
                               <div className="text-sm font-medium text-gray-800">{link.title}</div>
                               <div className="text-xs text-gray-400 truncate">{link.url}</div>
                             </div>
-                            <button onClick={() => { setEditingLinkId(link.id); setEditLink({ title: link.title, url: link.url, icon: link.icon || '' }) }} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200">編輯</button>
+                            <button onClick={() => {
+                              // 從 URL 中提取現有 UTM
+                              let cleanUrl = link.url
+                              let us = '', um = '', uc = ''
+                              try {
+                                const u = new URL(link.url)
+                                us = u.searchParams.get('utm_source') || ''
+                                um = u.searchParams.get('utm_medium') || ''
+                                uc = u.searchParams.get('utm_campaign') || ''
+                                u.searchParams.delete('utm_source')
+                                u.searchParams.delete('utm_medium')
+                                u.searchParams.delete('utm_campaign')
+                                cleanUrl = u.toString()
+                              } catch { /* ignore */ }
+                              setEditingLinkId(link.id)
+                              setEditLink({ title: link.title, url: cleanUrl, icon: link.icon || '', utm_source: us, utm_medium: um, utm_campaign: uc })
+                            }} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200">編輯</button>
                             <button onClick={() => handleToggleLink(link)} className={`text-xs px-2 py-1 rounded ${link.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'}`}>
                               {link.is_active ? '顯示' : '隱藏'}
                             </button>
