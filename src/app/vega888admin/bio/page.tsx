@@ -33,6 +33,8 @@ export default function BioManagePage() {
   const [formError, setFormError] = useState('')
   const [links, setLinks] = useState<BioLink[]>([])
   const [newLink, setNewLink] = useState({ title: '', url: '', icon: '', utm_source: '', utm_medium: '', utm_campaign: '' })
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null)
+  const [editLink, setEditLink] = useState({ title: '', url: '', icon: '' })
 
   const fetchData = useCallback(async () => {
     const [domainsRes, pagesRes] = await Promise.all([
@@ -131,6 +133,19 @@ export default function BioManagePage() {
     if (!editingPage) return
     await fetch(`/api/bio/${editingPage.id}/links/${linkId}`, { method: 'DELETE' })
     setLinks(links.filter(l => l.id !== linkId))
+  }
+
+  const handleSaveLink = async (linkId: string) => {
+    if (!editingPage) return
+    const res = await fetch(`/api/bio/${editingPage.id}/links/${linkId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: editLink.title, url: editLink.url, icon: editLink.icon }),
+    })
+    if (res.ok) {
+      setLinks(links.map(l => l.id === linkId ? { ...l, ...editLink } : l))
+      setEditingLinkId(null)
+    }
   }
 
   const handleToggleLink = async (link: BioLink) => {
@@ -364,16 +379,33 @@ export default function BioManagePage() {
                 {links.length > 0 && (
                   <div className="space-y-2 mb-4">
                     {links.map(link => (
-                      <div key={link.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <span className="text-lg">{link.icon || '🔗'}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-800">{link.title}</div>
-                          <div className="text-xs text-gray-400 truncate">{link.url}</div>
-                        </div>
-                        <button onClick={() => handleToggleLink(link)} className={`text-xs px-2 py-1 rounded ${link.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'}`}>
-                          {link.is_active ? '顯示' : '隱藏'}
-                        </button>
-                        <button onClick={() => handleDeleteLink(link.id)} className="text-red-500 hover:text-red-700 text-xs">刪除</button>
+                      <div key={link.id} className="p-3 bg-gray-50 rounded-lg">
+                        {editingLinkId === link.id ? (
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <input type="text" value={editLink.icon} onChange={e => setEditLink({ ...editLink, icon: e.target.value })} className="w-14 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center" />
+                              <input type="text" value={editLink.title} onChange={e => setEditLink({ ...editLink, title: e.target.value })} className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+                            </div>
+                            <input type="url" value={editLink.url} onChange={e => setEditLink({ ...editLink, url: e.target.value })} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+                            <div className="flex gap-2">
+                              <button onClick={() => handleSaveLink(link.id)} className="text-xs px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">儲存</button>
+                              <button onClick={() => setEditingLinkId(null)} className="text-xs px-3 py-1 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300">取消</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">{link.icon || '🔗'}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-800">{link.title}</div>
+                              <div className="text-xs text-gray-400 truncate">{link.url}</div>
+                            </div>
+                            <button onClick={() => { setEditingLinkId(link.id); setEditLink({ title: link.title, url: link.url, icon: link.icon || '' }) }} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200">編輯</button>
+                            <button onClick={() => handleToggleLink(link)} className={`text-xs px-2 py-1 rounded ${link.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'}`}>
+                              {link.is_active ? '顯示' : '隱藏'}
+                            </button>
+                            <button onClick={() => handleDeleteLink(link.id)} className="text-red-500 hover:text-red-700 text-xs">刪除</button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
