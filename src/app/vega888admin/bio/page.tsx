@@ -172,6 +172,21 @@ export default function BioManagePage() {
     { label: 'Poppins', value: 'Poppins', import: 'Poppins:wght@400;500;700' },
   ]
 
+  // 動態載入 Google Font
+  useEffect(() => {
+    const font = fontPresets.find(f => f.value === form.theme.fontFamily)
+    if (!font) return
+    const linkId = 'bio-preview-font'
+    let link = document.getElementById(linkId) as HTMLLinkElement | null
+    if (!link) {
+      link = document.createElement('link')
+      link.id = linkId
+      link.rel = 'stylesheet'
+      document.head.appendChild(link)
+    }
+    link.href = `https://fonts.googleapis.com/css2?family=${font.import}&display=swap`
+  }, [form.theme.fontFamily]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // 預設漸層方案
   const gradientPresets = [
     { label: '無', value: '' },
