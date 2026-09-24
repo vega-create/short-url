@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyAdmin } from '@/lib/auth'
+import { isSlugUsedBy } from '@/lib/slug'
 
 // GET: 列出所有短網址
 export async function GET(request: NextRequest) {
@@ -41,6 +42,10 @@ export async function POST(request: NextRequest) {
       { error: '網域、短碼、目標網址為必填' },
       { status: 400 }
     )
+  }
+
+  if (await isSlugUsedBy('bio_pages', domain_id, slug)) {
+    return NextResponse.json({ error: '此網域下已有同名的 Bio 頁面，請換一個短碼' }, { status: 409 })
   }
 
   const { data, error } = await supabaseAdmin

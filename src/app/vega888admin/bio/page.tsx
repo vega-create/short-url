@@ -234,7 +234,7 @@ export default function BioManagePage() {
   if (viewMode === 'create' || viewMode === 'edit') {
     const isEdit = viewMode === 'edit'
     const currentDomain = domains.find(d => d.id === form.domain_id)
-    const previewUrl = currentDomain ? `https://${currentDomain.domain}/@${form.slug}` : ''
+    const previewUrl = currentDomain ? `https://${currentDomain.domain}/${form.slug}` : ''
 
     // 預覽背景
     const previewBg: React.CSSProperties = form.theme.bgImage
@@ -569,7 +569,7 @@ export default function BioManagePage() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <div className="font-medium text-gray-800">{page.title || page.slug}</div>
-                    <div className="text-sm text-gray-600">https://{domain}/@{page.slug}</div>
+                    <div className="text-sm text-gray-600">https://{domain}/{page.slug}</div>
                   </div>
                 </div>
                 {page.bio && <p className="text-sm text-gray-500 mb-3">{page.bio}</p>}
@@ -578,7 +578,7 @@ export default function BioManagePage() {
                   <button onClick={() => handleEdit(page)} className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition">
                     編輯
                   </button>
-                  <a href={`https://${domain}/@${page.slug}`} target="_blank" className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
+                  <a href={`https://${domain}/${page.slug}`} target="_blank" className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
                     預覽
                   </a>
                   <button onClick={() => handleDelete(page.id)} className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition">

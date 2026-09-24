@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyAdmin } from '@/lib/auth'
+import { isSlugUsedBy, getDomainId } from '@/lib/slug'
 
 // GET: 取得單一短網址
 export async function GET(
@@ -35,6 +36,13 @@ export async function PUT(
   const body = await request.json()
   const { slug, name, target_url, is_active, use_ab_test, pixel_id, gtm_id, ga_id, tags,
     utm_source, utm_medium, utm_campaign, utm_term, utm_content, append_utm } = body
+
+  if (slug !== undefined) {
+    const domainId = await getDomainId('short_links', id)
+    if (domainId && await isSlugUsedBy('bio_pages', domainId, slug)) {
+      return NextResponse.json({ error: '此網域下已有同名的 Bio 頁面，請換一個短碼' }, { status: 409 })
+    }
+  }
 
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (slug !== undefined) updateData.slug = slug.trim()

@@ -14,9 +14,10 @@ export async function GET(
     return NextResponse.next()
   }
 
-  // Bio 頁面：@ 開頭
+  // Bio 頁面：@ 開頭（保留舊格式相容）
   if (firstSegment.startsWith('@')) {
-    return handleBioPage(host, firstSegment.slice(1))
+    const bio = await handleBioPage(host, firstSegment.slice(1))
+    return bio ?? new NextResponse('Page not found', { status: 404 })
   }
 
   // 短網址重定向
@@ -32,6 +33,9 @@ export async function GET(
     .single()
 
   if (!link) {
+    // 找不到短網址時，改用同名 slug 找 bio 頁（讓 bio 不必用 @ 前綴，網址更乾淨，仿 Lihi）
+    const bio = await handleBioPage(host, shortCode)
+    if (bio) return bio
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -214,7 +218,8 @@ ${trackingScripts}
 }
 
 // ===== Bio 頁面渲染 =====
-async function handleBioPage(host: string, bioSlug: string) {
+// 找到就回傳渲染好的 Response，找不到回傳 null（由呼叫端決定要 404 還是往下找）
+async function handleBioPage(host: string, bioSlug: string): Promise<Response | null> {
   const { data: page } = await supabaseAdmin
     .from('bio_pages')
     .select(`*, domains!inner(domain), bio_links(*)`)
@@ -223,7 +228,7 @@ async function handleBioPage(host: string, bioSlug: string) {
     .single()
 
   if (!page) {
-    return new NextResponse('Page not found', { status: 404 })
+    return null
   }
 
   const t = {

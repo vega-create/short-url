@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyAdmin } from '@/lib/auth'
+import { isSlugUsedBy, getDomainId } from '@/lib/slug'
 
 // GET
 export async function GET(
@@ -34,6 +35,13 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
+
+  if (body.slug !== undefined) {
+    const domainId = body.domain_id ?? await getDomainId('bio_pages', id)
+    if (domainId && await isSlugUsedBy('short_links', domainId, body.slug)) {
+      return NextResponse.json({ error: '此網域下已有同名的短網址，請換一個路徑' }, { status: 409 })
+    }
+  }
 
   const { data, error } = await supabaseAdmin
     .from('bio_pages')

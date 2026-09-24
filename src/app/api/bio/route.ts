@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyAdmin } from '@/lib/auth'
+import { isSlugUsedBy } from '@/lib/slug'
 
 // GET: 列出所有 Bio 頁面
 export async function GET(request: NextRequest) {
@@ -28,6 +29,10 @@ export async function POST(request: NextRequest) {
 
   if (!domain_id || !slug) {
     return NextResponse.json({ error: '網域和路徑為必填' }, { status: 400 })
+  }
+
+  if (await isSlugUsedBy('short_links', domain_id, slug)) {
+    return NextResponse.json({ error: '此網域下已有同名的短網址，請換一個路徑' }, { status: 409 })
   }
 
   const { data, error } = await supabaseAdmin
