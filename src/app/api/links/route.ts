@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json()
   const { domain_id, slug, name, target_url, pixel_id, gtm_id, ga_id, tags,
-    utm_source, utm_medium, utm_campaign, utm_term, utm_content, append_utm } = body
+    utm_source, utm_medium, utm_campaign, utm_term, utm_content, append_utm,
+    force_external, external_platforms } = body
 
   if (!domain_id || !slug || !target_url) {
     return NextResponse.json(
@@ -65,6 +66,8 @@ export async function POST(request: NextRequest) {
       utm_term: utm_term || null,
       utm_content: utm_content || null,
       append_utm: append_utm || false,
+      force_external: !!force_external,
+      external_platforms: Array.isArray(external_platforms) ? external_platforms : undefined,
     })
     .select('*, domains(domain)')
     .single()

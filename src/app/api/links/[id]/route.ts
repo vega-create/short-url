@@ -35,7 +35,8 @@ export async function PUT(
   const { id } = await params
   const body = await request.json()
   const { slug, name, target_url, is_active, use_ab_test, pixel_id, gtm_id, ga_id, tags,
-    utm_source, utm_medium, utm_campaign, utm_term, utm_content, append_utm } = body
+    utm_source, utm_medium, utm_campaign, utm_term, utm_content, append_utm,
+    force_external, external_platforms } = body
 
   if (slug !== undefined) {
     const domainId = await getDomainId('short_links', id)
@@ -60,6 +61,8 @@ export async function PUT(
   if (utm_term !== undefined) updateData.utm_term = utm_term || null
   if (utm_content !== undefined) updateData.utm_content = utm_content || null
   if (append_utm !== undefined) updateData.append_utm = append_utm
+  if (force_external !== undefined) updateData.force_external = !!force_external
+  if (Array.isArray(external_platforms)) updateData.external_platforms = external_platforms
 
   const { data, error } = await supabaseAdmin
     .from('short_links')

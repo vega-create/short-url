@@ -17,11 +17,13 @@ export async function GET(request: NextRequest) {
       .from('click_logs')
       .select('*', { count: 'exact', head: true })
       .eq('short_link_id', linkId)
+      .or('stage.is.null,stage.eq.landing')
 
     const { data: uniqueData } = await supabaseAdmin
       .from('click_logs')
       .select('ip')
       .eq('short_link_id', linkId)
+      .or('stage.is.null,stage.eq.landing')
 
     const uniqueIps = new Set(uniqueData?.map(d => d.ip) || [])
 
@@ -33,9 +35,11 @@ export async function GET(request: NextRequest) {
   }
 
   // 全部短網址的統計
+  // 只算第一次點擊：帶 _ext 回來的（escaped/stayed）和爬蟲不重複計；舊資料 stage 為 null 照算
   const { data: logs } = await supabaseAdmin
     .from('click_logs')
     .select('short_link_id, ip')
+    .or('stage.is.null,stage.eq.landing')
 
   const stats: Record<string, { total: number; ips: Set<string> }> = {}
 

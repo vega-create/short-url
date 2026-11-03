@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { selectTargetByWeight } from '@/lib/utils'
+import { detectInApp, detectOS, isBot, platformEnabled } from '@/lib/inAppBrowser'
+import { buildDestinationUrl, buildReturnUrl } from '@/lib/destinationUrl'
+import { renderExternalBrowserPage } from '@/lib/externalBrowserPage'
 
 export async function GET(
   request: NextRequest,
@@ -76,29 +79,14 @@ export async function GET(
     }
   }
 
-  // 附加 UTM 到目標網址（只有 append_utm=true 時）
-  if (link.append_utm) {
-    const utmEntries: [string, string][] = []
-    if (utmSource) utmEntries.push(['utm_source', utmSource])
-    if (utmMedium) utmEntries.push(['utm_medium', utmMedium])
-    if (utmCampaign) utmEntries.push(['utm_campaign', utmCampaign])
-    if (utmTerm) utmEntries.push(['utm_term', utmTerm])
-    if (utmContent) utmEntries.push(['utm_content', utmContent])
-
-    if (utmEntries.length > 0) {
-      try {
-        const urlObj = new URL(targetUrl)
-        for (const [key, val] of utmEntries) {
-          if (!urlObj.searchParams.has(key)) {
-            urlObj.searchParams.set(key, val)
-          }
-        }
-        targetUrl = urlObj.toString()
-      } catch {
-        // URL 格式有問題就不加
-      }
-    }
-  }
+  // === 組目的地網址 ===
+  // 使用者點擊時帶的參數（fbclid / gclid / utm_* …）轉傳到目的地，Pixel / CAPI 才拿得到歸因
+  // 優先順序：目的地自帶 > 後台設定（append_utm 時）> 使用者帶進來的；_ext 等內部標記不轉傳
+  const incomingParams = request.nextUrl.searchParams
+  const backendUtm = link.append_utm
+    ? { utm_source: utmSource, utm_medium: utmMedium, utm_campaign: utmCampaign, utm_term: utmTerm, utm_content: utmContent }
+    : {}
+  targetUrl = buildDestinationUrl(targetUrl, incomingParams, backendUtm)
 
   // 記錄點擊
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
@@ -107,6 +95,18 @@ export async function GET(
   const isMobile = /mobile|android|iphone/i.test(userAgent)
   const isTablet = /tablet|ipad/i.test(userAgent)
   const device = isTablet ? 'tablet' : isMobile ? 'mobile' : 'desktop'
+
+  // 外開瀏覽器相關：是不是爬蟲、在哪個 App 裡、走到哪一步
+  // stage：landing=第一次點擊 / escaped=已在外部瀏覽器開啟 / stayed=選擇留在 App 內 / bot=爬蟲
+  const bot = isBot(userAgent)
+  const inApp = detectInApp(userAgent)
+  const os = detectOS(userAgent)
+  const extFlag = incomingParams.get('_ext')
+  const stage = bot ? 'bot' : extFlag === '1' ? 'escaped' : extFlag === '0' ? 'stayed' : 'landing'
+  // 帶 _ext 回來時 UA 已是外部瀏覽器，App 名稱改從 _from 標記取得，統計才對得回平台
+  const inAppForLog: string | null = stage === 'escaped' || stage === 'stayed'
+    ? incomingParams.get('_from') || inApp
+    : inApp
 
   await supabaseAdmin.from('click_logs').insert({
     short_link_id: link.id,
@@ -118,7 +118,31 @@ export async function GET(
     utm_source: utmSource,
     utm_medium: utmMedium,
     utm_campaign: utmCampaign,
+    in_app: inAppForLog,
+    os,
+    stage,
   })
+
+  // 爬蟲（FB / LINE 分享預覽等）一律直接 302：讓它抓得到目的地的 OG，也避免被 Meta 當成 cloaking
+  if (bot) {
+    return NextResponse.redirect(targetUrl, 302)
+  }
+
+  // 強制外部瀏覽器：只在「第一次點擊 + 在勾選的 App 內建瀏覽器」時給中轉頁
+  // 帶 _ext 回來的一律不再給（硬規則，防無限跳轉）
+  if (link.force_external && stage === 'landing' && inApp && platformEnabled(inApp, link.external_platforms)) {
+    const proto = request.headers.get('x-forwarded-proto') || 'https'
+    const selfUrl = `${proto}://${host}${request.nextUrl.pathname}`
+    const mark = { _from: inApp }
+    return renderExternalBrowserPage({
+      platform: inApp,
+      os,
+      escapeUrl: buildReturnUrl(selfUrl, incomingParams, '1', inApp === 'line' ? { ...mark, openExternalBrowser: '1' } : mark),
+      stayUrl: buildReturnUrl(selfUrl, incomingParams, '0', mark),
+      copyUrl: selfUrl,
+      title: link.name || link.slug,
+    })
+  }
 
   // 有追蹤碼時，用 HTML 頁面載入追蹤碼再跳轉
   const hasTracking = link.pixel_id || link.gtm_id || link.ga_id

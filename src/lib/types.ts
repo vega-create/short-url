@@ -25,6 +25,8 @@ export interface ShortLink {
   utm_term: string | null
   utm_content: string | null
   append_utm: boolean
+  force_external: boolean
+  external_platforms: string[]
   created_at: string
   updated_at: string
   // Joined
@@ -69,6 +71,9 @@ export interface ClickLog {
   utm_source: string | null
   utm_medium: string | null
   utm_campaign: string | null
+  in_app: string | null
+  os: string | null
+  stage: string | null
   clicked_at: string
 }
 

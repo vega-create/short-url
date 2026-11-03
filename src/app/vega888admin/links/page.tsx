@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Domain, ShortLink, LinkTarget, ParamUtmRule } from '@/lib/types'
+import { EXTERNAL_PLATFORM_OPTIONS, DEFAULT_EXTERNAL_PLATFORMS } from '@/lib/inAppBrowser'
 import { buildShortUrl } from '@/lib/utils'
 
 type ViewMode = 'list' | 'create' | 'edit' | 'qr'
@@ -30,6 +31,8 @@ export default function LinksPage() {
     utm_term: '',
     utm_content: '',
     append_utm: false,
+    force_external: false,
+    external_platforms: [...DEFAULT_EXTERNAL_PLATFORMS] as string[],
   })
   const [formError, setFormError] = useState('')
   const [tagInput, setTagInput] = useState('')
@@ -79,7 +82,7 @@ export default function LinksPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const resetForm = () => {
-    setForm({ domain_id: domains[0]?.id || '', slug: '', name: '', target_url: '', pixel_id: '', gtm_id: '', ga_id: '', tags: [], utm_source: '', utm_medium: '', utm_campaign: '', utm_term: '', utm_content: '', append_utm: false })
+    setForm({ domain_id: domains[0]?.id || '', slug: '', name: '', target_url: '', pixel_id: '', gtm_id: '', ga_id: '', tags: [], utm_source: '', utm_medium: '', utm_campaign: '', utm_term: '', utm_content: '', append_utm: false, force_external: false, external_platforms: [...DEFAULT_EXTERNAL_PLATFORMS] as string[] })
     setFormError('')
     setTagInput('')
     setTargets([])
@@ -113,6 +116,8 @@ export default function LinksPage() {
       utm_term: data.utm_term || '',
       utm_content: data.utm_content || '',
       append_utm: data.append_utm || false,
+      force_external: data.force_external || false,
+      external_platforms: data.external_platforms || [...DEFAULT_EXTERNAL_PLATFORMS],
     })
     setTargets(data.link_targets || [])
     setUtmRules(data.param_utm_rules || [])
@@ -748,6 +753,54 @@ export default function LinksPage() {
             </div>
           </details>
 
+          {/* 強制外部瀏覽器（可收合） */}
+          <details className="mb-4" open={form.force_external}>
+            <summary className="text-sm font-medium text-gray-600 cursor-pointer hover:text-gray-800">
+              📲 強制外部瀏覽器（選用）
+            </summary>
+            <div className="mt-3 p-4 bg-sky-50 rounded-lg border border-sky-100">
+              <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-sky-200">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.force_external}
+                    onChange={e => setForm({ ...form, force_external: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+                </label>
+                <div>
+                  <div className="text-sm font-medium text-gray-700">在 App 內點擊時，改用手機的 Safari / Chrome 開啟</div>
+                  <div className="text-xs text-gray-400">內建瀏覽器沒有登入狀態與付款資料，結帳容易中斷；跳不出去會顯示引導畫面，不會卡住使用者</div>
+                </div>
+              </div>
+              {form.force_external && (
+                <div className="mt-3">
+                  <div className="text-xs font-medium text-gray-600 mb-2">哪些 App 要觸發</div>
+                  <div className="flex flex-wrap gap-2">
+                    {EXTERNAL_PLATFORM_OPTIONS.map(opt => (
+                      <label key={opt.value} className="flex items-center gap-1.5 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.external_platforms.includes(opt.value)}
+                          onChange={e => setForm({
+                            ...form,
+                            external_platforms: e.target.checked
+                              ? [...form.external_platforms, opt.value]
+                              : form.external_platforms.filter(p => p !== opt.value),
+                          })}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span>{opt.label}</span>
+                        {opt.note && <span className="text-xs text-gray-400">（{opt.note}）</span>}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
+
           {formError && <p className="text-red-500 text-sm mb-4">{formError}</p>}
 
           <button type="submit" className="bg-red-600 text-white px-6 py-2.5 rounded-lg hover:bg-red-700 transition font-medium text-sm">
@@ -1028,6 +1081,9 @@ export default function LinksPage() {
                         <span className="font-medium text-gray-800">{link.name || link.slug}</span>
                         {link.use_ab_test && (
                           <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">A/B</span>
+                        )}
+                        {link.force_external && (
+                          <span className="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">📲 外開</span>
                         )}
                         {link.utm_source && (
                           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">UTM</span>

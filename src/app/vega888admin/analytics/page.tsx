@@ -13,6 +13,9 @@ interface ClickLog {
   utm_source: string | null
   utm_medium: string | null
   utm_campaign: string | null
+  in_app?: string | null
+  os?: string | null
+  stage?: string | null
   clicked_at: string
   short_links?: {
     slug: string
@@ -84,21 +87,22 @@ export default function AnalyticsPage() {
     return true
   })
 
-  // 統計
-  const totalClicks = filteredLogs.length
-  const uniqueIps = new Set(filteredLogs.map(l => l.ip)).size
-  const deviceStats = filteredLogs.reduce((acc, l) => {
+  // 統計（只算第一次點擊：外開流程帶 _ext 回來的和爬蟲不重複計；舊資料 stage 為空照算）
+  const clickLogs = filteredLogs.filter(l => !l.stage || l.stage === 'landing')
+  const totalClicks = clickLogs.length
+  const uniqueIps = new Set(clickLogs.map(l => l.ip)).size
+  const deviceStats = clickLogs.reduce((acc, l) => {
     acc[l.device || 'unknown'] = (acc[l.device || 'unknown'] || 0) + 1
     return acc
   }, {} as Record<string, number>)
-  const paramStats = filteredLogs.reduce((acc, l) => {
+  const paramStats = clickLogs.reduce((acc, l) => {
     const p = l.param || '（無參數）'
     acc[p] = (acc[p] || 0) + 1
     return acc
   }, {} as Record<string, number>)
 
   // UTM 來源/媒介統計
-  const sourceStats = filteredLogs.reduce((acc, l) => {
+  const sourceStats = clickLogs.reduce((acc, l) => {
     if (l.utm_source) {
       const key = `${l.utm_source}/${l.utm_medium || '(none)'}`
       acc[key] = (acc[key] || 0) + 1
@@ -107,12 +111,30 @@ export default function AnalyticsPage() {
   }, {} as Record<string, number>)
 
   // UTM 活動統計
-  const campaignStats = filteredLogs.reduce((acc, l) => {
+  const campaignStats = clickLogs.reduce((acc, l) => {
     if (l.utm_campaign) {
       acc[l.utm_campaign] = (acc[l.utm_campaign] || 0) + 1
     }
     return acc
   }, {} as Record<string, number>)
+
+  // 外部瀏覽器跳轉統計（只看在 App 內建瀏覽器的點擊）
+  const extLanding = clickLogs.filter(l => l.in_app).length
+  const extEscaped = filteredLogs.filter(l => l.stage === 'escaped').length
+  const extStayed = filteredLogs.filter(l => l.stage === 'stayed').length
+  const extRate = extLanding > 0 ? Math.round((extEscaped / extLanding) * 100) : 0
+  const extByPlatform = filteredLogs.reduce((acc, l) => {
+    const isLanding = !!l.in_app && (!l.stage || l.stage === 'landing')
+    const isEscaped = l.stage === 'escaped'
+    const isStayed = l.stage === 'stayed'
+    if (!isLanding && !isEscaped && !isStayed) return acc
+    const key = `${l.in_app || '?'} / ${l.os || '?'}`
+    if (!acc[key]) acc[key] = { landing: 0, escaped: 0, stayed: 0 }
+    if (isLanding) acc[key].landing++
+    if (isEscaped) acc[key].escaped++
+    if (isStayed) acc[key].stayed++
+    return acc
+  }, {} as Record<string, { landing: number; escaped: number; stayed: number }>)
 
   // 分頁
   const totalPages = Math.ceil(filteredLogs.length / perPage)
@@ -246,6 +268,54 @@ export default function AnalyticsPage() {
           <div className="text-sm text-gray-500 mt-1">電腦點擊</div>
         </div>
       </div>
+
+      {/* 外部瀏覽器跳轉 */}
+      {(extLanding > 0 || extEscaped > 0 || extStayed > 0) && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">📲 外部瀏覽器跳轉</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-gray-800">{extLanding}</div>
+              <div className="text-xs text-gray-500 mt-1">App 內建瀏覽器點擊</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-emerald-600">{extEscaped}</div>
+              <div className="text-xs text-gray-500 mt-1">成功跳出</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-amber-600">{extStayed}</div>
+              <div className="text-xs text-gray-500 mt-1">留在 App 內</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-sky-600">{extRate}%</div>
+              <div className="text-xs text-gray-500 mt-1">跳出成功率</div>
+            </div>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
+                <th className="py-2 font-medium">App / 系統</th>
+                <th className="py-2 font-medium text-right">點擊</th>
+                <th className="py-2 font-medium text-right">跳出</th>
+                <th className="py-2 font-medium text-right">留下</th>
+                <th className="py-2 font-medium text-right">成功率</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {Object.entries(extByPlatform).sort((a, b) => b[1].landing - a[1].landing).map(([key, s]) => (
+                <tr key={key}>
+                  <td className="py-2 text-gray-700">{key}</td>
+                  <td className="py-2 text-right text-gray-700">{s.landing}</td>
+                  <td className="py-2 text-right text-emerald-600">{s.escaped}</td>
+                  <td className="py-2 text-right text-amber-600">{s.stayed}</td>
+                  <td className="py-2 text-right text-gray-700">{s.landing > 0 ? Math.round((s.escaped / s.landing) * 100) : 0}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-xs text-gray-400 mt-3">成功率 = 跳出 ÷ 點擊。這些跳轉方式（LINE 除外）都不是官方支援，App 改版後可能失效，數字掉下來就要查。</p>
+        </div>
+      )}
 
       {/* 路徑參數統計 */}
       {Object.keys(paramStats).length > 1 && (
@@ -428,6 +498,7 @@ export default function AnalyticsPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">路徑參數</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">來源/媒介</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">裝置</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">App / 階段</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">IP</th>
                   </tr>
                 </thead>
@@ -470,6 +541,16 @@ export default function AnalyticsPage() {
                         }`}>
                           {log.device === 'mobile' ? '📱 手機' : log.device === 'desktop' ? '💻 電腦' : log.device === 'tablet' ? '📱 平板' : log.device || '未知'}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {log.in_app && (
+                          <span className="inline-block bg-sky-50 text-sky-700 px-2 py-0.5 rounded text-xs mr-1">📲 {log.in_app}</span>
+                        )}
+                        {log.stage === 'escaped' && <span className="inline-block bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-xs">已跳出</span>}
+                        {log.stage === 'stayed' && <span className="inline-block bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-xs">留在 App</span>}
+                        {log.stage === 'bot' && <span className="inline-block bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-xs">🤖 爬蟲</span>}
+                        {!log.in_app && !log.stage && <span className="text-gray-300">—</span>}
+                        {!log.in_app && log.stage === 'landing' && <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs font-mono">{log.ip}</td>
                     </tr>
