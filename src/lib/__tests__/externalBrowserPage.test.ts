@@ -41,6 +41,13 @@ describe('renderExternalBrowserPage', () => {
     expect(html2).toContain('\\u003c/script>')
   })
 
+  it('從外部瀏覽器回來時，改顯示「已經幫你打開了」與「再開一次」', async () => {
+    const { html } = await render({ ...base, platform: 'line', os: 'ios' })
+    expect(html).toContain('已經幫你用瀏覽器打開了')
+    expect(html).toContain('再開一次')
+    expect(html).toContain('hid=true')
+  })
+
   it('TikTok 沒有自動跳轉按鈕，直接顯示引導', async () => {
     const { html } = await render({ ...base, platform: 'tiktok', os: 'android' })
     expect(html).not.toContain('id="b"')

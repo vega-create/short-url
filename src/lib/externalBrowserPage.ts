@@ -71,10 +71,14 @@ p{font-size:15px;line-height:1.6;color:#4b5563}
     <p>正在為你用瀏覽器開啟…</p>
   </div>
   <div id="g">
-    <div class="arrow">${hint.where === '右下角' ? '↘' : '↗'}</div>
-    <h1>用瀏覽器開啟<br>結帳更順利</h1>
-    <p>點${hint.where}的 <b>⋯</b> 選單</p>
-    <div class="step">選擇「${hint.item}」</div>
+    <div id="m">
+      <div class="arrow">${hint.where === '右下角' ? '↘' : '↗'}</div>
+    </div>
+    <h1 id="h">用瀏覽器開啟<br>結帳更順利</h1>
+    <div id="m2">
+      <p>點${hint.where}的 <b>⋯</b> 選單</p>
+      <div class="step">選擇「${hint.item}」</div>
+    </div>
     ${canAutoJump ? '<button class="btn p" id="b" type="button">用瀏覽器開啟</button>' : ''}
     <button class="btn s" id="c" type="button">複製連結</button>
     <input id="f" readonly>
@@ -85,8 +89,17 @@ p{font-size:15px;line-height:1.6;color:#4b5563}
 <script>
 (function(){
 var P=${js(o.platform)},OS=${js(o.os)},ESC=${js(o.escapeUrl)},STAY=${js(o.stayUrl)},COPY=${js(o.copyUrl)},AUTO=${canAutoJump};
-var g=document.getElementById('g'),w=document.getElementById('w'),shown=false,t;
-function show(){if(shown)return;shown=true;w.style.display='none';g.style.display='block';}
+var g=document.getElementById('g'),w=document.getElementById('w'),shown=false,hid=false,t;
+function show(){
+  if(shown)return;shown=true;w.style.display='none';g.style.display='block';
+  // 曾經被切到背景＝外部瀏覽器已開啟；使用者回來時改成「已經幫你開了」，不再教手動開
+  if(hid){
+    document.getElementById('m').style.display='none';
+    document.getElementById('m2').style.display='none';
+    document.getElementById('h').innerHTML='已經幫你用瀏覽器打開了 ✓';
+    if(b)b.textContent='再開一次';
+  }
+}
 function jump(){
   try{
     if(P==='line'){location.replace(ESC);return;}
@@ -112,7 +125,7 @@ if(AUTO){
   jump();
   t=setTimeout(show,1500);
   document.addEventListener('visibilitychange',function(){
-    if(document.hidden){clearTimeout(t);}else{show();}
+    if(document.hidden){clearTimeout(t);hid=true;}else{show();}
   });
 }else{show();}
 })();
