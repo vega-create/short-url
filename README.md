@@ -14,54 +14,48 @@
 
 ## 技術架構
 
-- **前端/後端**：Next.js 15 (App Router)
-- **資料庫**：Supabase (PostgreSQL)
-- **部署**：Vercel
+- **前端/後端**：Next.js 16 (App Router)，以 [OpenNext for Cloudflare](https://opennext.js.org/cloudflare) 跑在 Cloudflare Workers
+- **資料庫**：Cloudflare D1（SQLite）。schema 在 `migrations/d1/`，程式透過 `src/lib/db.ts` 的 supabase-js 相容層存取
+- **檔案**：Cloudflare R2（QR Logo／背景圖、Bio Logo），由 `/api/files/<key>` 讀出
+- **QR Code**：純 JS 產生（`src/lib/qr/`，uqr + upng-js + jpeg-js），Workers 不需要 sharp
 - **樣式**：Tailwind CSS
+
+> 2026-11 前為 Supabase（Postgres）+ Vercel；搬遷腳本見 `scripts/migrate-from-supabase.mjs`，舊 schema 保留在 `supabase/migrations/` 供對照。
 
 ## 快速開始
 
-### 1. 建立 Supabase 專案
-
-前往 [supabase.com](https://supabase.com) 建立專案，然後到 SQL Editor 執行：
-
-```
-supabase/migrations/001_init.sql
-```
-
-### 2. 設定環境變數
-
-```bash
-cp .env.example .env.local
-```
-
-填入 Supabase 的 URL、Key，以及管理員密碼。
-
-### 3. 安裝並啟動
+### 1. 安裝與本機資料庫
 
 ```bash
 npm install
-npm run dev
+npm run d1:migrate          # 建本機 D1（.wrangler/state/v3）
+cp .dev.vars.example .dev.vars   # 填入 ADMIN_PASSWORD
+npm run dev                 # next dev，會自動拿到本機 D1 / R2 綁定
 ```
 
-### 4. 前往後台
+### 2. 前往後台
 
-瀏覽 `http://localhost:3000/admin`，輸入管理員密碼登入。
+瀏覽 `http://localhost:3000/vega888admin`，輸入管理員密碼登入。
+短網址的「網域」要先在後台新增 `localhost:3000` 才能在本機測轉址。
 
-## 部署到 Vercel
+### 3. 用 Workers 執行環境預覽
 
-1. 推送到 GitHub
-2. 在 Vercel import 專案
-3. 設定環境變數
-4. 到 Settings → Domains 新增你的網域/子網域
-
-### DNS 設定
-
+```bash
+npm run preview             # opennextjs-cloudflare build + wrangler dev
 ```
-類型    主機名稱    指向
-CNAME   go          cname.vercel-dns.com
-CNAME   link        cname.vercel-dns.com
-```
+
+## 部署到 Cloudflare
+
+1. `npx wrangler login`（需要 d1 / r2 / workers 權限）
+2. 建資源（只需一次）：`npx wrangler d1 create short-url`、`npx wrangler r2 bucket create short-url-uploads`，把 database_id 填進 `wrangler.jsonc`
+3. 套 schema：`npm run d1:migrate:remote`
+4. 設密碼：`npx wrangler secret put ADMIN_PASSWORD`
+5. 部署：`npm run deploy`
+6. 網域：`wrangler.jsonc` 的 `routes` 每個短網址網域一行（`custom_domain: true`），zone 必須在同一個 Cloudflare 帳號；
+   或到 Dashboard → Workers → short-url → Domains & Routes 新增。DNS 由 Cloudflare 自動建立，不需要再設 CNAME。
+
+每週日會由 GitHub Actions（`.github/workflows/backup.yml`）用 `wrangler d1 export` 備份整個 D1 成 Artifact，
+需要在 repo secrets 設 `CLOUDFLARE_API_TOKEN`（Account → D1:Edit）。
 
 ## 使用方式
 
@@ -106,10 +100,12 @@ src/
 │   ├── layout.tsx
 │   └── page.tsx
 ├── lib/
-│   ├── supabase.ts              # Supabase 客戶端
+│   ├── db.ts                    # D1 / R2 相容層（supabase-js 寫法）
+│   ├── db-types.ts              # 欄位轉換與關聯對照
+│   ├── qr/                      # 純 JS QR 產生
 │   ├── types.ts                 # TypeScript 型別
 │   ├── utils.ts                 # 工具函式
 │   └── auth.ts                  # 認證邏輯
-└── supabase/
-    └── migrations/001_init.sql  # 資料庫 Schema
+└── migrations/d1/0001_init.sql  # D1 Schema
+scripts/migrate-from-supabase.mjs # Supabase → D1 一次性搬運
 ```

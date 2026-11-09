@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "short-url",
+  "account_id": "86e28a4ac02bab6c0599d99f50afb5f1",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  // 資料層：Cloudflare D1（SQLite）。schema 在 migrations/d1/；本機 next dev 自動用 .wrangler/state 的本機 D1。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "short-url",
+      "database_id": "c2087a2c-c645-4a8f-aebb-078552095c1b",
+      "migrations_dir": "migrations/d1"
+    }
+  ],
+  // 上傳的 QR Logo／背景圖、Bio Logo（原 Supabase Storage bucket `uploads`）。
+  // 由 /api/files/<key> 讀出，不需要開 R2 公開網域。
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "short-url-uploads"
+    }
+  ],
+  // 短網址網域：每個都要是這個 Cloudflare 帳號下的 zone。先上 aimom.vip；
+  // 其他 go／link 類網域（domains 表裡的）切 DNS 時再一行一行加進來，或在 Dashboard → Worker → Domains & Routes 加。
+  "routes": [
+    { "pattern": "aimom.vip", "custom_domain": true }
+  ]
+  // 敏感值用 `npx wrangler secret put ADMIN_PASSWORD` 設定（不寫進檔案）。
+  // 本機 next dev / wrangler dev 讀 .dev.vars（見 .dev.vars.example）。
+}

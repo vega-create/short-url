@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAdminPassword } from '@/lib/env'
 
 export async function POST(request: NextRequest) {
   const { password } = await request.json()
+  const expected = getAdminPassword()
 
-  if (password === process.env.ADMIN_PASSWORD) {
+  if (expected && password === expected) {
     const response = NextResponse.json({ success: true })
-    response.cookies.set('admin_token', process.env.ADMIN_PASSWORD!, {
+    response.cookies.set('admin_token', expected, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

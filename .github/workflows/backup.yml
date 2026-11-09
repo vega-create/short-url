@@ -1,0 +1,45 @@
+name: 每週備份 D1
+
+# 每週備份 Cloudflare D1（short-url）：完整 SQL dump（schema + 資料）存成 Artifact（保留 90 天）。
+# D1 本身另有 30 天時間點還原（wrangler d1 time-travel），這份是額外的離線副本。
+#
+# 需要的 GitHub Secret（Settings → Secrets and variables → Actions）：
+#   CLOUDFLARE_API_TOKEN  Cloudflare API Token，權限：Account → D1:Edit（d1 export 也需要 Edit）
+on:
+  schedule:
+    - cron: '30 20 * * 0' # 每週日 UTC 20:30（台灣週一 04:30）
+  workflow_dispatch: {} # 也可在 GitHub 手動觸發
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: 86e28a4ac02bab6c0599d99f50afb5f1
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 備份只需要 wrangler，不裝整包依賴
+      - run: npm install wrangler@4 --no-save --no-audit --no-fund
+
+      - name: 匯出 D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          mkdir -p backup-out
+          npx wrangler d1 export short-url --remote --output "backup-out/short-url-$(date -u +%Y%m%d).sql"
+          ls -la backup-out
+
+      - name: 上傳備份 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: short-url-d1-backup-${{ github.run_number }}
+          path: backup-out/
+          retention-days: 90

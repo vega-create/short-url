@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+!.env.example
+
+# Cloudflare / OpenNext
+.open-next/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+
+# Claude Code 本機 launch 設定
+.claude/

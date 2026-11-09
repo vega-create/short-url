@@ -1,7 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
-import QRCode from 'qrcode'
-import sharp from 'sharp'
+import { supabaseAdmin, getR2, r2KeyFromUrl } from '@/lib/db'
+import { renderQrPng, renderQrSvg } from '@/lib/qr/qrImage'
+
+// 2026-11：搬到 Cloudflare Workers 後跑不了 sharp，QR 改用純 JS 產生（src/lib/qr/）。
+// 行為與原本相同：ecc H、quiet zone 2、Logo 佔 20% 置中加白色圓角底、背景圖 cover 鋪滿。
+
+const MIN_SIZE = 64
+const MAX_SIZE = 2000
+
+/** 讀圖片 bytes：自家上傳（/api/files/<key>）直接從 R2 拿，其他網址用 fetch；失敗回 null（降級為不加圖） */
+async function loadImage(url: string | null | undefined): Promise<Uint8Array | null> {
+  if (!url) return null
+  try {
+    const key = r2KeyFromUrl(url)
+    if (key) {
+      const obj = await getR2().get(key)
+      return obj ? new Uint8Array(await obj.arrayBuffer()) : null
+    }
+    const res = await fetch(url)
+    if (!res.ok) return null
+    return new Uint8Array(await res.arrayBuffer())
+  } catch {
+    return null
+  }
+}
 
 // GET: 產生 QR Code 圖片
 export async function GET(
@@ -10,7 +32,8 @@ export async function GET(
 ) {
   const { linkId } = await params
   const { searchParams } = new URL(request.url)
-  const size = parseInt(searchParams.get('size') || '400')
+  const requested = parseInt(searchParams.get('size') || '400')
+  const size = Math.min(MAX_SIZE, Math.max(MIN_SIZE, Number.isFinite(requested) ? requested : 400))
   const format = searchParams.get('format') || 'png'
 
   const { data: link } = await supabaseAdmin
@@ -26,103 +49,25 @@ export async function GET(
   const domain = (link.domains as { domain: string }).domain
   const protocol = domain.includes('localhost') ? 'http' : 'https'
   const url = `${protocol}://${domain}/${link.slug}`
-  
+
   // QR 設定（可能為陣列或單一物件）
   const settings = Array.isArray(link.qr_settings)
     ? link.qr_settings[0] || {}
     : link.qr_settings || {}
 
-  // 產生 QR Code
-  const qrBuffer = await QRCode.toBuffer(url, {
-    width: size,
-    margin: 2,
-    errorCorrectionLevel: 'H', // 高容錯，才能放 Logo
-    color: {
-      dark: settings.fg_color || '#000000',
-      light: settings.bg_image_url ? '#00000000' : (settings.bg_color || '#ffffff'),
-    },
-  })
+  const [bgImage, logo] = await Promise.all([loadImage(settings.bg_image_url), loadImage(settings.logo_url)])
 
-  let composited = qrBuffer
-
-  // 有背景圖片時，把 QR Code 疊在背景圖上
-  if (settings.bg_image_url) {
-    try {
-      const bgResponse = await fetch(settings.bg_image_url)
-      const bgArrayBuffer = await bgResponse.arrayBuffer()
-      const bgBuffer = await sharp(Buffer.from(bgArrayBuffer))
-        .resize(size, size, { fit: 'cover' })
-        .png()
-        .toBuffer()
-
-      // QR Code 加半透明效果讓背景可見
-      const qrWithAlpha = await sharp(qrBuffer)
-        .ensureAlpha()
-        .png()
-        .toBuffer()
-
-      composited = await sharp(bgBuffer)
-        .composite([{ input: qrWithAlpha, gravity: 'center' }])
-        .png()
-        .toBuffer()
-    } catch {
-      // 背景圖載入失敗，用純色
-    }
+  const opts = {
+    url,
+    size,
+    fgColor: settings.fg_color || '#000000',
+    bgColor: settings.bg_color || '#ffffff',
+    bgImage,
+    logo,
   }
 
-  // 如果有 Logo，合成到中央
-  if (settings.logo_url) {
-    try {
-      const logoResponse = await fetch(settings.logo_url)
-      const logoArrayBuffer = await logoResponse.arrayBuffer()
-      const logoSize = Math.floor(size * 0.2) // Logo 佔 20%
-
-      const logo = await sharp(Buffer.from(logoArrayBuffer))
-        .resize(logoSize, logoSize, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
-        .png()
-        .toBuffer()
-
-      // 建立白色背景圓角方塊（Logo 底）
-      const padding = Math.floor(logoSize * 0.15)
-      const bgSize = logoSize + padding * 2
-      const bgSvg = `<svg width="${bgSize}" height="${bgSize}">
-        <rect width="${bgSize}" height="${bgSize}" rx="8" fill="white"/>
-      </svg>`
-
-      const bgBuffer = await sharp(Buffer.from(bgSvg)).png().toBuffer()
-
-      const final = await sharp(composited)
-        .composite([
-          { input: bgBuffer, gravity: 'center' },
-          { input: logo, gravity: 'center' },
-        ])
-        .png()
-        .toBuffer()
-
-      return new NextResponse(new Uint8Array(final), {
-        headers: {
-          'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=3600',
-        },
-      })
-    } catch {
-      // Logo 載入失敗，回傳無 Logo 版本
-    }
-  }
-
-  // SVG 格式
   if (format === 'svg') {
-    const svgString = await QRCode.toString(url, {
-      type: 'svg',
-      width: size,
-      margin: 2,
-      color: {
-        dark: settings.fg_color || '#000000',
-        light: settings.bg_color || '#ffffff',
-      },
-    })
-
-    return new NextResponse(svgString, {
+    return new NextResponse(renderQrSvg(opts), {
       headers: {
         'Content-Type': 'image/svg+xml',
         'Cache-Control': 'public, max-age=3600',
@@ -130,7 +75,8 @@ export async function GET(
     })
   }
 
-  return new NextResponse(new Uint8Array(composited), {
+  const png = renderQrPng(opts)
+  return new NextResponse(new Uint8Array(png), {
     headers: {
       'Content-Type': 'image/png',
       'Cache-Control': 'public, max-age=3600',

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/db'
 import { selectTargetByWeight } from '@/lib/utils'
 import { detectInApp, detectOS, isBot, platformEnabled } from '@/lib/inAppBrowser'
 import { buildDestinationUrl, buildReturnUrl } from '@/lib/destinationUrl'

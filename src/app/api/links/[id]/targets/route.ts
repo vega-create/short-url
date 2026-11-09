@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/db'
 import { verifyAdmin } from '@/lib/auth'
 
 // GET: 列出某短網址的所有目標

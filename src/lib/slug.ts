@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabase'
+import { supabaseAdmin } from './db'
 
 /**
  * 短網址與 Bio 頁共用同一個網址空間（例如 aimom.vip/learn），
